@@ -7,6 +7,7 @@ import {
   Download,
   Eraser,
   Expand,
+  Eye,
   FileImage,
   Gauge,
   Layers3,
@@ -118,6 +119,7 @@ export default function DranimoEditor() {
   const [drawing, setDrawing] = useState<StrokePoint[]>([]);
   const [isDrawing, setIsDrawing] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
+  const [showPlaybackFrame, setShowPlaybackFrame] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [playbackError, setPlaybackError] = useState("");
   const [loadError, setLoadError] = useState("");
@@ -226,11 +228,12 @@ export default function DranimoEditor() {
   );
 
   useEffect(() => {
-    const visible = isPreviewing
-      ? getVisibleStrokes(schedule, currentTime)
-      : project.strokes.map((stroke) => ({ stroke, points: stroke.points }));
+    const visible =
+      showPlaybackFrame && schedule.valid
+        ? getVisibleStrokes(schedule, currentTime)
+        : project.strokes.map((stroke) => ({ stroke, points: stroke.points }));
     drawCanvas(visible);
-  }, [currentTime, drawCanvas, isPreviewing, project.strokes, schedule]);
+  }, [currentTime, drawCanvas, project.strokes, schedule, showPlaybackFrame]);
 
   useEffect(() => {
     playbackTimeRef.current = currentTime;
@@ -273,6 +276,7 @@ export default function DranimoEditor() {
     );
     setCurrentTime(0);
     setIsPreviewing(false);
+    setShowPlaybackFrame(false);
   };
 
   const updateBrush = (patch: Partial<BrushSettings>) =>
@@ -299,6 +303,7 @@ export default function DranimoEditor() {
     if (event.button !== 0) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     setIsPreviewing(false);
+    setShowPlaybackFrame(false);
     setDrawing([pointFromEvent(event)]);
     setIsDrawing(true);
   };
@@ -385,6 +390,7 @@ export default function DranimoEditor() {
     }
     if (!schedule.duration) return;
     setCurrentTime((time) => (time >= schedule.duration ? 0 : time));
+    setShowPlaybackFrame(true);
     setIsPreviewing(true);
     setPlaybackError("");
   };
@@ -596,6 +602,7 @@ export default function DranimoEditor() {
                 onClick={() => {
                   setCurrentTime(0);
                   setIsPreviewing(false);
+                  setShowPlaybackFrame(true);
                 }}
               >
                 <RotateCcw size={17} />
@@ -627,6 +634,7 @@ export default function DranimoEditor() {
                 value={currentTime}
                 onChange={(event) => {
                   setIsPreviewing(false);
+                  setShowPlaybackFrame(true);
                   setCurrentTime(Number(event.target.value));
                 }}
                 style={{ "--progress": `${progress}%` } as React.CSSProperties}
@@ -637,6 +645,16 @@ export default function DranimoEditor() {
               </div>
             </div>
             <div className="playback-extra">
+              <IconButton
+                label={showPlaybackFrame ? "编辑完整画布" : "预览当前时间点"}
+                active={!showPlaybackFrame}
+                onClick={() => {
+                  setIsPreviewing(false);
+                  setShowPlaybackFrame((visible) => !visible);
+                }}
+              >
+                {showPlaybackFrame ? <Pencil size={17} /> : <Eye size={17} />}
+              </IconButton>
               <span className="stroke-count">{project.strokes.length} 笔</span>
               <IconButton
                 label="全屏画布"
