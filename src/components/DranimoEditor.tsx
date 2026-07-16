@@ -53,7 +53,7 @@ import {
 } from "@/lib/types";
 
 const COLORS = [
-  "#172b24",
+  "#000000",
   "#d86a49",
   "#3478c4",
   "#d8a23c",
@@ -774,7 +774,7 @@ export default function DranimoEditor() {
                     {project.brush.color === color && (
                       <Check
                         size={14}
-                        color={color === "#ffffff" ? "#172b24" : "white"}
+                        color={color === "#ffffff" ? "#000000" : "white"}
                       />
                     )}
                   </button>
@@ -1069,7 +1069,7 @@ export default function DranimoEditor() {
             </div>
             <div className="export-form">
               <div className="format-options">
-                {(["png", "svg", "mov", "webm", "mp4"] as const).map(
+                {(["png", "svg", "webm", "mov", "mp4"] as const).map(
                   (format) => (
                     <button
                       type="button"
@@ -1101,11 +1101,15 @@ export default function DranimoEditor() {
                               ? "剪辑视频"
                               : "动画视频"}
                       </span>
-                      {format === "mov" && <small>ProRes 4444 Alpha</small>}
-                      {format === "webm" && (
-                        <small>{transparentExport ? "VP9 Alpha" : "VP9"}</small>
+                      {format === "mov" && (
+                        <small>ProRes 4444 Alpha · 大文件</small>
                       )}
-                      {format === "mp4" && <small>H.264</small>}
+                      {format === "webm" && (
+                        <small>
+                          {transparentExport ? "VP9 Alpha · 小文件" : "VP9"}
+                        </small>
+                      )}
+                      {format === "mp4" && <small>H.264 · 不透明</small>}
                     </button>
                   ),
                 )}
@@ -1115,7 +1119,10 @@ export default function DranimoEditor() {
                   <span>背景</span>
                   <select
                     value={getExportBackground(exportSettings)}
-                    disabled={exportSettings.format === "mov"}
+                    disabled={
+                      exportSettings.format === "mov" ||
+                      exportSettings.format === "mp4"
+                    }
                     onChange={(event) =>
                       setExportSettings((current) => ({
                         ...current,
@@ -1212,10 +1219,10 @@ export default function DranimoEditor() {
                   exportSettings.format === "mp4") && (
                   <small>
                     {exportSettings.format === "mov"
-                      ? "· ProRes 4444 Alpha · 剪辑软件透明视频"
+                      ? "· ProRes 4444 Alpha · 剪辑兼容 · 文件较大"
                       : exportSettings.format === "webm"
                         ? transparentExport
-                          ? "· VP9 Alpha · 导出后验证透明像素"
+                          ? "· VP9 Alpha · 透明小文件 · 导出后验证"
                           : "· VP9 · 纯色背景"
                         : "· H.264 · 纯色背景"}
                   </small>

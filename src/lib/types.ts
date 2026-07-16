@@ -90,7 +90,7 @@ export const CANVAS_PRESETS: Record<
 };
 
 export const DEFAULT_BRUSH: BrushSettings = {
-  color: "#172b24",
+  color: "#000000",
   size: 16,
   opacity: 1,
   thinning: 0,

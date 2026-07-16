@@ -30,9 +30,15 @@ function normalizeBrush(
 }
 
 function normalizeProject(project: ProjectV1): ProjectV1 {
+  const brush = normalizeBrush(project.brush);
   return {
     ...project,
-    brush: normalizeBrush(project.brush),
+    // Migrate the previous built-in dark-green default to black. Existing
+    // stroke snapshots stay unchanged so saved artwork keeps its appearance.
+    brush: {
+      ...brush,
+      color: brush.color === "#172b24" ? "#000000" : brush.color,
+    },
     strokes: project.strokes.map((stroke) => ({
       ...stroke,
       brush: normalizeBrush(stroke.brush),

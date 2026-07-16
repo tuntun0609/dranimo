@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { Writable } from "node:stream";
 import sharp from "sharp";
 import { getExportDimensions, projectToSvg } from "@/lib/export";
@@ -14,6 +14,8 @@ export const dynamic = "force-dynamic";
 
 const MAX_VIDEO_DURATION_MS = 60_000;
 const MAX_OUTPUT_BYTES = 2_000_000_000;
+// Sharp rasterizes these SVG frames to 8-bit RGBA, so 16-bit alpha adds no precision.
+const PRORES_ALPHA_BITS = 8;
 
 type ProResRequest = {
   project?: ProjectV1;
@@ -92,6 +94,8 @@ async function encodeProRes(
       "prores_ks",
       "-profile:v",
       "4",
+      "-alpha_bits",
+      String(PRORES_ALPHA_BITS),
       "-pix_fmt",
       "yuva444p10le",
       "-f",
