@@ -100,15 +100,24 @@ function drawPath(
   offsetX: number,
   offsetY: number,
 ) {
-  const outline = getStrokeOutline(points, stroke.brush).points;
-  if (!outline.length) return;
+  const outline = getStrokeOutline(points, stroke.brush, true).points;
+  if (outline.length < 4) return;
+  const transformed = outline.map((point) => ({
+    x: (point.x - offsetX) * scale,
+    y: (point.y - offsetY) * scale,
+  }));
   ctx.beginPath();
-  outline.forEach((point, index) => {
-    const x = (point.x - offsetX) * scale;
-    const y = (point.y - offsetY) * scale;
-    if (index === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  });
+  ctx.moveTo(transformed[0].x, transformed[0].y);
+  for (let index = 1; index < transformed.length - 1; index += 1) {
+    const control = transformed[index];
+    const next = transformed[index + 1];
+    ctx.quadraticCurveTo(
+      control.x,
+      control.y,
+      (control.x + next.x) / 2,
+      (control.y + next.y) / 2,
+    );
+  }
   ctx.closePath();
   ctx.fillStyle = stroke.brush.color;
   ctx.globalAlpha = stroke.brush.opacity;
@@ -157,7 +166,7 @@ export function renderProjectFrame(
     offsetY: bounds.minY,
     scale: actualScale,
     background:
-      settings.format === "mp4" || project.canvas.background === "solid"
+      settings.format === "mp4" || settings.background !== "transparent"
         ? project.canvas.backgroundColor
         : undefined,
     strokes: visible,
@@ -184,11 +193,12 @@ export function projectToSvg(
           y: (point.y - bounds.minY) * actualScale,
         }),
       );
-      return `<path d="${outlineToPath(outline)}" fill="${stroke.brush.color}" fill-opacity="${stroke.brush.opacity}"/>`;
+      const path = outlineToPath(outline);
+      return `<path d="${path}" fill="${stroke.brush.color}" fill-opacity="${stroke.brush.opacity}"/>`;
     })
     .join("");
   const background =
-    project.canvas.background === "solid"
+    settings.background !== "transparent"
       ? `<rect width="100%" height="100%" fill="${project.canvas.backgroundColor}"/>`
       : "";
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${background}${paths}</svg>`;

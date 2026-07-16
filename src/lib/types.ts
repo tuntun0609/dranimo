@@ -37,6 +37,7 @@ export interface CanvasSettings {
   ratio: AspectRatio;
   width: number;
   height: number;
+  /** Retained for v1 project compatibility; export settings control output transparency. */
   background: BackgroundMode;
   backgroundColor: string;
 }
@@ -58,6 +59,7 @@ export interface ProjectV1 {
 
 export interface ExportSettings {
   format: ExportFormat;
+  background?: BackgroundMode;
   crop: ExportCrop;
   scale: 1 | 2 | 3;
   padding: number;

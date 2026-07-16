@@ -24,7 +24,7 @@ import {
   Volume2,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   canvasToPng,
   createExportCanvas,
@@ -33,12 +33,11 @@ import {
   exportWebM,
   getExportDimensions,
   projectToSvg,
-  renderFrame,
   renderProjectFrame,
 } from "@/lib/export";
 import { loadProject, saveProject } from "@/lib/persistence";
 import { buildPlaybackSchedule, getVisibleStrokes } from "@/lib/playback";
-import { pointHitsStroke } from "@/lib/stroke-geometry";
+import { pointHitsStroke, strokePath } from "@/lib/stroke-geometry";
 import {
   type BrushSettings,
   CANVAS_PRESETS,
@@ -60,6 +59,22 @@ const COLORS = [
   "#e64e72",
   "#ffffff",
 ];
+
+function appendDistinctPoints(current: StrokePoint[], samples: StrokePoint[]) {
+  let next = current;
+  for (const sample of samples) {
+    const previous = next[next.length - 1];
+    if (
+      previous &&
+      Math.hypot(previous.x - sample.x, previous.y - sample.y) < 0.5
+    ) {
+      continue;
+    }
+    if (next === current) next = [...current];
+    next.push(sample);
+  }
+  return next;
+}
 
 function IconButton({
   label,
@@ -117,7 +132,6 @@ export default function DranimoEditor() {
   const [redo, setRedo] = useState<StrokeRecord[][]>([]);
   const [tool, setTool] = useState<Tool>("brush");
   const [drawing, setDrawing] = useState<StrokePoint[]>([]);
-  const [isDrawing, setIsDrawing] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [showPlaybackFrame, setShowPlaybackFrame] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -129,6 +143,7 @@ export default function DranimoEditor() {
   const [exportProgress, setExportProgress] = useState<number | null>(null);
   const [exportSettings, setExportSettings] = useState<ExportSettings>({
     format: "png",
+    background: "solid",
     crop: "full",
     scale: 2,
     padding: 32,
@@ -136,8 +151,9 @@ export default function DranimoEditor() {
   });
   const [stageSize, setStageSize] = useState({ width: 640, height: 640 });
   const [savedAt, setSavedAt] = useState<number | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+  const drawingRef = useRef<StrokePoint[]>([]);
+  const activePointerIdRef = useRef<number | null>(null);
   const animationRef = useRef<number | null>(null);
   const startRef = useRef(0);
   const playbackTimeRef = useRef(0);
@@ -151,6 +167,56 @@ export default function DranimoEditor() {
     () => getExportDimensions(project, exportSettings),
     [project, exportSettings],
   );
+  const canvasDisplaySize = useMemo(() => {
+    const availableWidth = Math.max(1, stageSize.width - 40);
+    const availableHeight = Math.max(1, stageSize.height - 40);
+    const scale = Math.min(
+      availableWidth / project.canvas.width,
+      availableHeight / project.canvas.height,
+      900 / project.canvas.width,
+      900 / project.canvas.height,
+    );
+    return {
+      width: Math.max(1, Math.floor(project.canvas.width * scale)),
+      height: Math.max(1, Math.floor(project.canvas.height * scale)),
+    };
+  }, [project.canvas.height, project.canvas.width, stageSize]);
+  const visibleStrokes = useMemo(
+    () =>
+      showPlaybackFrame && schedule.valid
+        ? getVisibleStrokes(schedule, currentTime)
+        : project.strokes.map((stroke) => ({
+            stroke,
+            points: stroke.points,
+          })),
+    [currentTime, project.strokes, schedule, showPlaybackFrame],
+  );
+  const visiblePaths = useMemo(
+    () =>
+      visibleStrokes.map(({ stroke, points }) => ({
+        id: stroke.id,
+        color: stroke.brush.color,
+        opacity: stroke.brush.opacity,
+        // 局部回放仍在采样时不要把末端当成完成笔画，否则圆帽会先于轮廓出现。
+        path: strokePath(
+          stroke,
+          points,
+          !showPlaybackFrame || points.length >= stroke.points.length,
+        ),
+      })),
+    [showPlaybackFrame, visibleStrokes],
+  );
+  const drawingPath = useMemo(() => {
+    if (!drawing.length || tool !== "brush") return "";
+    const preview: StrokeRecord = {
+      id: "preview",
+      points: drawing,
+      brush: project.brush,
+      createdAt: 0,
+    };
+    // 绘制中让 perfect-freehand 继续平滑末端，避免完成态圆帽显示成孤立圆点。
+    return strokePath(preview, drawing, false);
+  }, [drawing, project.brush, tool]);
 
   useEffect(() => {
     let mounted = true;
@@ -184,56 +250,6 @@ export default function DranimoEditor() {
     observer.observe(stageRef.current);
     return () => observer.disconnect();
   }, []);
-
-  const drawCanvas = useCallback(
-    (
-      visibleStrokes: Array<{ stroke: StrokeRecord; points: StrokePoint[] }>,
-    ) => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      canvas.width = project.canvas.width;
-      canvas.height = project.canvas.height;
-      const context = canvas.getContext("2d");
-      if (!context) return;
-      renderFrame(context, project, {
-        width: project.canvas.width,
-        height: project.canvas.height,
-        offsetX: 0,
-        offsetY: 0,
-        scale: 1,
-        background:
-          project.canvas.background === "solid"
-            ? project.canvas.backgroundColor
-            : undefined,
-        strokes: visibleStrokes,
-      });
-      if (drawing.length && tool === "brush") {
-        const preview: StrokeRecord = {
-          id: "preview",
-          points: drawing,
-          brush: project.brush,
-          createdAt: 0,
-        };
-        renderFrame(context, project, {
-          width: project.canvas.width,
-          height: project.canvas.height,
-          offsetX: 0,
-          offsetY: 0,
-          scale: 1,
-          strokes: [...visibleStrokes, { stroke: preview, points: drawing }],
-        });
-      }
-    },
-    [drawing, project, tool],
-  );
-
-  useEffect(() => {
-    const visible =
-      showPlaybackFrame && schedule.valid
-        ? getVisibleStrokes(schedule, currentTime)
-        : project.strokes.map((stroke) => ({ stroke, points: stroke.points }));
-    drawCanvas(visible);
-  }, [currentTime, drawCanvas, project.strokes, schedule, showPlaybackFrame]);
 
   useEffect(() => {
     playbackTimeRef.current = currentTime;
@@ -285,46 +301,81 @@ export default function DranimoEditor() {
       brush: { ...current.brush, ...patch },
     }));
 
-  const pointFromEvent = (
-    event: React.PointerEvent<HTMLCanvasElement>,
-  ): StrokePoint => {
+  const pointsFromEvent = (
+    event: React.PointerEvent<SVGSVGElement>,
+    fallbackPressure = 0.5,
+  ): StrokePoint[] => {
+    const svg = event.currentTarget;
     const rect = event.currentTarget.getBoundingClientRect();
-    const pressure =
-      event.pressure && event.pressure > 0 ? event.pressure : 0.5;
-    return {
-      x: ((event.clientX - rect.left) / rect.width) * project.canvas.width,
-      y: ((event.clientY - rect.top) / rect.height) * project.canvas.height,
-      pressure,
-      t: performance.now(),
-    };
-  };
-
-  const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    if (event.button !== 0) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    setIsPreviewing(false);
-    setShowPlaybackFrame(false);
-    setDrawing([pointFromEvent(event)]);
-    setIsDrawing(true);
-  };
-
-  const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!isDrawing) return;
-    const next = pointFromEvent(event);
-    setDrawing((points) => {
-      const previous = points[points.length - 1];
-      if (previous && Math.hypot(previous.x - next.x, previous.y - next.y) < 1)
-        return points;
-      return [...points, next];
+    const screenToViewBox =
+      typeof svg.getScreenCTM === "function"
+        ? svg.getScreenCTM()?.inverse()
+        : null;
+    const svgPoint =
+      screenToViewBox && typeof svg.createSVGPoint === "function"
+        ? svg.createSVGPoint()
+        : null;
+    const coalesced = event.nativeEvent.getCoalescedEvents?.() ?? [];
+    const samples = coalesced.length ? coalesced : [event.nativeEvent];
+    return samples.map((sample) => {
+      // pointerup 常把 pressure 重置为 0；沿用上一点，避免末端宽度突变成圆点。
+      const pressure = sample.pressure > 0 ? sample.pressure : fallbackPressure;
+      if (screenToViewBox && svgPoint) {
+        svgPoint.x = sample.clientX;
+        svgPoint.y = sample.clientY;
+        const point = svgPoint.matrixTransform(screenToViewBox);
+        return {
+          x: point.x,
+          y: point.y,
+          pressure,
+          t: sample.timeStamp,
+        };
+      }
+      return {
+        x: ((sample.clientX - rect.left) / rect.width) * project.canvas.width,
+        y: ((sample.clientY - rect.top) / rect.height) * project.canvas.height,
+        pressure,
+        t: sample.timeStamp,
+      };
     });
   };
 
-  const finishDrawing = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!isDrawing) return;
-    setIsDrawing(false);
-    const points = drawing.length
-      ? [...drawing, pointFromEvent(event)]
-      : drawing;
+  const handlePointerDown = (event: React.PointerEvent<SVGSVGElement>) => {
+    if (event.button !== 0) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    activePointerIdRef.current = event.pointerId;
+    setIsPreviewing(false);
+    setShowPlaybackFrame(false);
+    const points = pointsFromEvent(event);
+    drawingRef.current = points;
+    setDrawing(points);
+  };
+
+  const handlePointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
+    if (activePointerIdRef.current !== event.pointerId) return;
+    const points = appendDistinctPoints(
+      drawingRef.current,
+      pointsFromEvent(
+        event,
+        drawingRef.current[drawingRef.current.length - 1]?.pressure ?? 0.5,
+      ),
+    );
+    if (points === drawingRef.current) return;
+    drawingRef.current = points;
+    setDrawing(points);
+  };
+
+  const finishDrawing = (event: React.PointerEvent<SVGSVGElement>) => {
+    if (activePointerIdRef.current !== event.pointerId) return;
+    activePointerIdRef.current = null;
+    const points = appendDistinctPoints(
+      drawingRef.current,
+      pointsFromEvent(
+        event,
+        drawingRef.current[drawingRef.current.length - 1]?.pressure ?? 0.5,
+      ),
+    );
+    drawingRef.current = [];
     setDrawing([]);
     if (points.length === 0) return;
     if (tool === "eraser") {
@@ -566,24 +617,45 @@ export default function DranimoEditor() {
           </div>
           <div className="stage" ref={stageRef}>
             <div
-              className={`canvas-wrap ${project.canvas.background === "transparent" ? "checkerboard" : ""}`}
+              className="canvas-wrap"
               style={{
-                aspectRatio: `${project.canvas.width} / ${project.canvas.height}`,
-                maxWidth: stageSize.width - 40,
-                maxHeight: stageSize.height - 40,
+                width: canvasDisplaySize.width,
+                height: canvasDisplaySize.height,
               }}
             >
-              <canvas
-                ref={canvasRef}
-                className={`drawing-canvas ${tool === "eraser" ? "eraser-cursor" : "brush-cursor"}`}
+              <svg
+                className={`drawing-surface ${tool === "eraser" ? "eraser-cursor" : "brush-cursor"}`}
+                viewBox={`0 0 ${project.canvas.width} ${project.canvas.height}`}
+                aria-label="绘图画布"
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
                 onPointerUp={finishDrawing}
                 onPointerCancel={finishDrawing}
-                onPointerLeave={(event) => {
-                  if (isDrawing) handlePointerMove(event);
-                }}
-              />
+              >
+                <title>绘图画布</title>
+                <rect
+                  width={project.canvas.width}
+                  height={project.canvas.height}
+                  fill={project.canvas.backgroundColor}
+                />
+                {visiblePaths.map(({ id, path, color, opacity }) => (
+                  <path
+                    key={id}
+                    d={path}
+                    fill={color}
+                    fillOpacity={opacity}
+                    pointerEvents="none"
+                  />
+                ))}
+                {drawingPath && (
+                  <path
+                    d={drawingPath}
+                    fill={project.brush.color}
+                    fillOpacity={project.brush.opacity}
+                    pointerEvents="none"
+                  />
+                )}
+              </svg>
               {!project.strokes.length && !drawing.length && (
                 <div className="canvas-empty">
                   <div className="empty-icon">
@@ -816,63 +888,23 @@ export default function DranimoEditor() {
                   </button>
                 ))}
               </div>
-              <div className="background-row">
-                <span>背景</span>
-                <div className="segmented">
-                  <button
-                    type="button"
-                    className={
-                      project.canvas.background === "solid" ? "selected" : ""
-                    }
-                    onClick={() =>
-                      setProject((current) => ({
-                        ...current,
-                        canvas: { ...current.canvas, background: "solid" },
-                      }))
-                    }
-                  >
-                    纯色
-                  </button>
-                  <button
-                    type="button"
-                    className={
-                      project.canvas.background === "transparent"
-                        ? "selected"
-                        : ""
-                    }
-                    onClick={() =>
-                      setProject((current) => ({
-                        ...current,
-                        canvas: {
-                          ...current.canvas,
-                          background: "transparent",
-                        },
-                      }))
-                    }
-                  >
-                    透明
-                  </button>
-                </div>
-              </div>
-              {project.canvas.background === "solid" && (
-                <label className="background-color">
-                  <span>背景色</span>
-                  <input
-                    type="color"
-                    value={project.canvas.backgroundColor}
-                    onChange={(event) =>
-                      setProject((current) => ({
-                        ...current,
-                        canvas: {
-                          ...current.canvas,
-                          backgroundColor: event.target.value,
-                        },
-                      }))
-                    }
-                  />
-                  <code>{project.canvas.backgroundColor}</code>
-                </label>
-              )}
+              <label className="background-color">
+                <span>背景色</span>
+                <input
+                  type="color"
+                  value={project.canvas.backgroundColor}
+                  onChange={(event) =>
+                    setProject((current) => ({
+                      ...current,
+                      canvas: {
+                        ...current.canvas,
+                        backgroundColor: event.target.value,
+                      },
+                    }))
+                  }
+                />
+                <code>{project.canvas.backgroundColor}</code>
+              </label>
             </Section>
             <Section title="动画节奏" icon={<Gauge size={16} />}>
               <div className="mode-tabs">
@@ -1034,7 +1066,11 @@ export default function DranimoEditor() {
                       exportSettings.format === format ? "selected" : ""
                     }
                     onClick={() =>
-                      setExportSettings((current) => ({ ...current, format }))
+                      setExportSettings((current) => ({
+                        ...current,
+                        format,
+                        ...(format === "mp4" ? { background: "solid" } : {}),
+                      }))
                     }
                   >
                     <span className="format-badge">{format.toUpperCase()}</span>
@@ -1051,6 +1087,29 @@ export default function DranimoEditor() {
                 ))}
               </div>
               <div className="form-grid">
+                <label>
+                  <span>
+                    背景{exportSettings.format === "mp4" && "（MP4 固定纯色）"}
+                  </span>
+                  <select
+                    value={
+                      exportSettings.format === "mp4"
+                        ? "solid"
+                        : exportSettings.background
+                    }
+                    disabled={exportSettings.format === "mp4"}
+                    onChange={(event) =>
+                      setExportSettings((current) => ({
+                        ...current,
+                        background: event.target
+                          .value as ExportSettings["background"],
+                      }))
+                    }
+                  >
+                    <option value="solid">纯色（编辑器背景色）</option>
+                    <option value="transparent">透明</option>
+                  </select>
+                </label>
                 <label>
                   <span>画布范围</span>
                   <select

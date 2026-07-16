@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { getStrokeOutline } from "./stroke-geometry";
+import { getStrokeOutline, outlineToPath } from "./stroke-geometry";
 import type { BrushSettings, StrokePoint } from "./types";
 
 const brush: BrushSettings = {
@@ -47,5 +47,40 @@ describe("getStrokeOutline", () => {
 
     assert.notDeepEqual(smoothed.points, unsmoothed.points);
     assert.notDeepEqual(streamlined.points, unsmoothed.points);
+  });
+
+  test("live strokes trail the pointer until the stroke is complete", () => {
+    const points = Array.from({ length: 8 }, (_, index) =>
+      point(index * 20, 20, index * 10),
+    );
+    const live = getStrokeOutline(
+      points,
+      { ...brush, streamline: 0.5 },
+      false,
+    ).points;
+    const complete = getStrokeOutline(
+      points,
+      { ...brush, streamline: 0.5 },
+      true,
+    ).points;
+
+    assert.notDeepEqual(live, complete);
+    assert.ok(
+      Math.max(...complete.map(({ x }) => x)) >
+        Math.max(...live.map(({ x }) => x)),
+    );
+  });
+
+  test("creates a smooth quadratic path instead of a line polygon", () => {
+    const path = outlineToPath([
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 10 },
+      { x: 0, y: 10 },
+      { x: 0, y: 0 },
+    ]);
+
+    assert.match(path, /^M .* Q .* T .* Z$/);
+    assert.doesNotMatch(path, / L /);
   });
 });

@@ -51,6 +51,7 @@ function boundsFor(points: Vec2[]): Bounds {
 export function getStrokeOutline(
   points: StrokePoint[],
   brush: BrushSettings,
+  isComplete = true,
 ): StrokeOutline {
   if (!points.length) return { points: [], bounds: boundsFor([]) };
   const outline = getStroke(
@@ -70,26 +71,44 @@ export function getStrokeOutline(
         cap: brush.capEnd,
         taper: Math.max(0, brush.endTaper),
       },
-      last: true,
+      last: isComplete,
     },
   ).map(([x, y]) => ({ x, y }));
   return { points: outline, bounds: boundsFor(outline) };
 }
 
 export function outlineToPath(outline: Vec2[]) {
-  if (!outline.length) return "";
-  const start = outline[0];
-  const parts = [`M ${start.x.toFixed(2)} ${start.y.toFixed(2)}`];
-  for (let index = 1; index < outline.length; index += 1) {
-    const point = outline[index];
-    parts.push(`L ${point.x.toFixed(2)} ${point.y.toFixed(2)}`);
+  if (outline.length < 4) return "";
+  const first = outline[0];
+  const control = outline[1];
+  const next = outline[2];
+  const midpoint = (a: Vec2, b: Vec2) => ({
+    x: (a.x + b.x) / 2,
+    y: (a.y + b.y) / 2,
+  });
+  const firstEnd = midpoint(control, next);
+  const parts = [
+    `M ${first.x.toFixed(2)} ${first.y.toFixed(2)}`,
+    `Q ${control.x.toFixed(2)} ${control.y.toFixed(2)} ${firstEnd.x.toFixed(2)} ${firstEnd.y.toFixed(2)}`,
+    "T",
+  ];
+
+  for (let index = 2; index < outline.length - 1; index += 1) {
+    const end = midpoint(outline[index], outline[index + 1]);
+    parts.push(`${end.x.toFixed(2)} ${end.y.toFixed(2)}`);
   }
   parts.push("Z");
   return parts.join(" ");
 }
 
-export function strokePath(stroke: StrokeRecord, points = stroke.points) {
-  return outlineToPath(getStrokeOutline(points, stroke.brush).points);
+export function strokePath(
+  stroke: StrokeRecord,
+  points = stroke.points,
+  isComplete = true,
+) {
+  return outlineToPath(
+    getStrokeOutline(points, stroke.brush, isComplete).points,
+  );
 }
 
 export function unionBounds(strokes: StrokeRecord[]): Bounds | null {
