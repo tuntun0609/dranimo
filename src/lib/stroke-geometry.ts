@@ -1,3 +1,4 @@
+import { getStroke } from "perfect-freehand";
 import type { BrushSettings, StrokePoint, StrokeRecord } from "./types";
 
 export interface Vec2 {
@@ -17,9 +18,6 @@ export interface Bounds {
   maxY: number;
 }
 
-const clamp = (value: number, min: number, max: number) =>
-  Math.min(max, Math.max(min, value));
-
 function distance(a: Vec2, b: Vec2) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
@@ -30,35 +28,6 @@ export function strokeLength(points: StrokePoint[]) {
       index === 0 ? 0 : sum + distance(point, points[index - 1]),
     0,
   );
-}
-
-function resample(points: StrokePoint[], streamline: number) {
-  if (points.length < 3) return points;
-  const amount = clamp(streamline, 0, 1) * 0.78;
-  const result = [points[0]];
-  for (let index = 1; index < points.length; index += 1) {
-    const previous = result[result.length - 1];
-    const point = points[index];
-    result.push({
-      x: previous.x + (point.x - previous.x) * (1 - amount),
-      y: previous.y + (point.y - previous.y) * (1 - amount),
-      pressure: point.pressure,
-      t: point.t,
-    });
-  }
-  return result;
-}
-
-function pointWidth(point: StrokePoint, brush: BrushSettings) {
-  const pressure = brush.simulatePressure
-    ? clamp(point.pressure || 0.5, 0.08, 1)
-    : 0.72;
-  const thinning = clamp(brush.thinning, -1, 1);
-  const pressureFactor =
-    thinning >= 0
-      ? 0.5 + pressure * 0.75 * thinning
-      : 1 - (1 - pressure) * Math.abs(thinning) * 0.6;
-  return Math.max(0.5, brush.size * pressureFactor);
 }
 
 function boundsFor(points: Vec2[]): Bounds {
@@ -84,68 +53,26 @@ export function getStrokeOutline(
   brush: BrushSettings,
 ): StrokeOutline {
   if (!points.length) return { points: [], bounds: boundsFor([]) };
-  const sampled = resample(points, brush.streamline);
-  if (sampled.length === 1 || strokeLength(sampled) < 0.25) {
-    const center = sampled[0];
-    const radius = pointWidth(center, brush) / 2;
-    const circle = Array.from({ length: 24 }, (_, index) => {
-      const angle = (index / 24) * Math.PI * 2;
-      return {
-        x: center.x + Math.cos(angle) * radius,
-        y: center.y + Math.sin(angle) * radius,
-      };
-    });
-    return { points: circle, bounds: boundsFor(circle) };
-  }
-
-  const left: Vec2[] = [];
-  const right: Vec2[] = [];
-  sampled.forEach((point, index) => {
-    const before = sampled[Math.max(0, index - 1)];
-    const after = sampled[Math.min(sampled.length - 1, index + 1)];
-    const dx = after.x - before.x;
-    const dy = after.y - before.y;
-    const length = Math.hypot(dx, dy) || 1;
-    const normal = { x: -dy / length, y: dx / length };
-    const radius = pointWidth(point, brush) / 2;
-    left.push({
-      x: point.x + normal.x * radius,
-      y: point.y + normal.y * radius,
-    });
-    right.push({
-      x: point.x - normal.x * radius,
-      y: point.y - normal.y * radius,
-    });
-  });
-
-  const outline = [...left];
-  const last = sampled[sampled.length - 1];
-  const lastRadius = pointWidth(last, brush) / 2;
-  const lastBefore = sampled[sampled.length - 2];
-  const endAngle = Math.atan2(last.y - lastBefore.y, last.x - lastBefore.x);
-  if (brush.capEnd) {
-    for (let index = 1; index < 8; index += 1) {
-      const angle = endAngle + Math.PI / 2 - (Math.PI * index) / 8;
-      outline.push({
-        x: last.x + Math.cos(angle) * lastRadius,
-        y: last.y + Math.sin(angle) * lastRadius,
-      });
-    }
-  }
-  outline.push(...right.reverse());
-  const first = sampled[0];
-  const firstAfter = sampled[1];
-  const firstRadius = pointWidth(first, brush) / 2;
-  const startAngle = Math.atan2(firstAfter.y - first.y, firstAfter.x - first.x);
-  if (brush.capStart) {
-    for (let index = 1; index < 8; index += 1) {
-      const angle = startAngle - Math.PI / 2 - (Math.PI * index) / 8;
-      outline.push({
-        x: first.x + Math.cos(angle) * firstRadius,
-        y: first.y + Math.sin(angle) * firstRadius,
-      });
-    }
-  }
+  const outline = getStroke(
+    points.map(({ x, y, pressure }) => ({ x, y, pressure })),
+    {
+      size: Math.max(0.1, brush.size),
+      thinning: Math.min(1, Math.max(-1, brush.thinning)),
+      smoothing: Math.min(1, Math.max(0, brush.smoothing)),
+      streamline: Math.min(1, Math.max(0, brush.streamline)),
+      easing: (pressure) => pressure,
+      simulatePressure: brush.simulatePressure,
+      start: {
+        cap: brush.capStart,
+        taper: Math.max(0, brush.startTaper),
+      },
+      end: {
+        cap: brush.capEnd,
+        taper: Math.max(0, brush.endTaper),
+      },
+      last: true,
+    },
+  ).map(([x, y]) => ({ x, y }));
   return { points: outline, bounds: boundsFor(outline) };
 }
 

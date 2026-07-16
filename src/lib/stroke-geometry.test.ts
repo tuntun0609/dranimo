@@ -31,16 +31,21 @@ describe("getStrokeOutline", () => {
       brush,
     ).points;
 
-    const endCap = outline.slice(2, 9);
-    const startCap = outline.slice(11);
-
-    assert.equal(endCap.length, 7);
-    assert.equal(startCap.length, 7);
-    assert.ok(endCap.every(({ x }) => x > 30));
-    assert.ok(startCap.every(({ x }) => x < 10));
-    const endExtension = Math.max(...endCap.map(({ x }) => x)) - 30;
-    const startExtension = 10 - Math.min(...startCap.map(({ x }) => x));
+    const endExtension = Math.max(...outline.map(({ x }) => x)) - 30;
+    const startExtension = 10 - Math.min(...outline.map(({ x }) => x));
     assert.ok(endExtension > 0);
-    assert.ok(Math.abs(endExtension - startExtension) < 1e-8);
+    assert.ok(Math.abs(endExtension - startExtension) < 0.2);
+  });
+
+  test("advanced geometry settings change the generated outline", () => {
+    const points = Array.from({ length: 20 }, (_, index) =>
+      point(index * 6, Math.sin(index * 1.7) * 14 + 50, index * 10),
+    );
+    const smoothed = getStrokeOutline(points, { ...brush, smoothing: 1 });
+    const unsmoothed = getStrokeOutline(points, { ...brush, smoothing: 0 });
+    const streamlined = getStrokeOutline(points, { ...brush, streamline: 1 });
+
+    assert.notDeepEqual(smoothed.points, unsmoothed.points);
+    assert.notDeepEqual(streamlined.points, unsmoothed.points);
   });
 });

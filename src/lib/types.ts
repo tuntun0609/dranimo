@@ -89,11 +89,11 @@ export const CANVAS_PRESETS: Record<
 
 export const DEFAULT_BRUSH: BrushSettings = {
   color: "#172b24",
-  size: 18,
+  size: 16,
   opacity: 1,
-  thinning: 0.45,
-  smoothing: 0.55,
-  streamline: 0.65,
+  thinning: 0,
+  smoothing: 0.61,
+  streamline: 0.5,
   simulatePressure: true,
   startTaper: 0,
   endTaper: 0,
