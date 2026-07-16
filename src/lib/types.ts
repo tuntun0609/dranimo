@@ -2,7 +2,7 @@ export type AspectRatio = "square" | "landscape" | "portrait";
 export type BackgroundMode = "solid" | "transparent";
 export type PlaybackMode = "real" | "fixed" | "total";
 export type Tool = "brush" | "eraser";
-export type ExportFormat = "png" | "svg" | "webm" | "mp4";
+export type ExportFormat = "png" | "svg" | "webm" | "mov" | "mp4";
 export type ExportCrop = "full" | "fit";
 
 export interface StrokePoint {

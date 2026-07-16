@@ -30,7 +30,9 @@ import {
   createExportCanvas,
   downloadBlob,
   exportMP4,
+  exportTransparentMOV,
   exportWebM,
+  getExportBackground,
   getExportDimensions,
   projectToSvg,
   renderProjectFrame,
@@ -167,6 +169,8 @@ export default function DranimoEditor() {
     () => getExportDimensions(project, exportSettings),
     [project, exportSettings],
   );
+  const transparentExport =
+    getExportBackground(exportSettings) === "transparent";
   const canvasDisplaySize = useMemo(() => {
     const availableWidth = Math.max(1, stageSize.width - 40);
     const availableHeight = Math.max(1, stageSize.height - 40);
@@ -451,7 +455,9 @@ export default function DranimoEditor() {
     setExporting(true);
     setExportError("");
     setExportProgress(
-      exportSettings.format === "webm" || exportSettings.format === "mp4"
+      exportSettings.format === "webm" ||
+        exportSettings.format === "mov" ||
+        exportSettings.format === "mp4"
         ? 0
         : null,
     );
@@ -470,10 +476,15 @@ export default function DranimoEditor() {
         );
       } else if (
         exportSettings.format === "webm" ||
+        exportSettings.format === "mov" ||
         exportSettings.format === "mp4"
       ) {
         const exportVideo =
-          exportSettings.format === "webm" ? exportWebM : exportMP4;
+          exportSettings.format === "webm"
+            ? exportWebM
+            : exportSettings.format === "mov"
+              ? exportTransparentMOV
+              : exportMP4;
         const blob = await exportVideo(project, schedule, exportSettings, {
           onProgress: (progress) =>
             setExportProgress(Math.round(progress * 100)),
@@ -1058,46 +1069,53 @@ export default function DranimoEditor() {
             </div>
             <div className="export-form">
               <div className="format-options">
-                {(["png", "svg", "webm", "mp4"] as const).map((format) => (
-                  <button
-                    type="button"
-                    key={format}
-                    className={
-                      exportSettings.format === format ? "selected" : ""
-                    }
-                    onClick={() =>
-                      setExportSettings((current) => ({
-                        ...current,
-                        format,
-                        ...(format === "mp4" ? { background: "solid" } : {}),
-                      }))
-                    }
-                  >
-                    <span className="format-badge">{format.toUpperCase()}</span>
-                    <span>
-                      {format === "png"
-                        ? "静态图片"
-                        : format === "svg"
-                          ? "矢量图形"
-                          : "动画视频"}
-                    </span>
-                    {format === "webm" && <small>VP9 Alpha</small>}
-                    {format === "mp4" && <small>H.264</small>}
-                  </button>
-                ))}
+                {(["png", "svg", "mov", "webm", "mp4"] as const).map(
+                  (format) => (
+                    <button
+                      type="button"
+                      key={format}
+                      className={
+                        exportSettings.format === format ? "selected" : ""
+                      }
+                      onClick={() =>
+                        setExportSettings((current) => ({
+                          ...current,
+                          format,
+                          ...(format === "mov"
+                            ? { background: "transparent" }
+                            : format === "mp4"
+                              ? { background: "solid" }
+                              : {}),
+                        }))
+                      }
+                    >
+                      <span className="format-badge">
+                        {format.toUpperCase()}
+                      </span>
+                      <span>
+                        {format === "png"
+                          ? "静态图片"
+                          : format === "svg"
+                            ? "矢量图形"
+                            : format === "mov"
+                              ? "剪辑视频"
+                              : "动画视频"}
+                      </span>
+                      {format === "mov" && <small>ProRes 4444 Alpha</small>}
+                      {format === "webm" && (
+                        <small>{transparentExport ? "VP9 Alpha" : "VP9"}</small>
+                      )}
+                      {format === "mp4" && <small>H.264</small>}
+                    </button>
+                  ),
+                )}
               </div>
               <div className="form-grid">
                 <label>
-                  <span>
-                    背景{exportSettings.format === "mp4" && "（MP4 固定纯色）"}
-                  </span>
+                  <span>背景</span>
                   <select
-                    value={
-                      exportSettings.format === "mp4"
-                        ? "solid"
-                        : exportSettings.background
-                    }
-                    disabled={exportSettings.format === "mp4"}
+                    value={getExportBackground(exportSettings)}
+                    disabled={exportSettings.format === "mov"}
                     onChange={(event) =>
                       setExportSettings((current) => ({
                         ...current,
@@ -1164,6 +1182,7 @@ export default function DranimoEditor() {
                   </label>
                 )}
                 {(exportSettings.format === "webm" ||
+                  exportSettings.format === "mov" ||
                   exportSettings.format === "mp4") && (
                   <label>
                     <span>帧率</span>
@@ -1189,11 +1208,16 @@ export default function DranimoEditor() {
                   {dimensions.width} × {dimensions.height}px
                 </strong>
                 {(exportSettings.format === "webm" ||
+                  exportSettings.format === "mov" ||
                   exportSettings.format === "mp4") && (
                   <small>
-                    {exportSettings.format === "webm"
-                      ? "· VP9 Alpha · 最长边限制 3840px"
-                      : "· H.264 · 不含透明 · 最长边限制 3840px"}
+                    {exportSettings.format === "mov"
+                      ? "· ProRes 4444 Alpha · 剪辑软件透明视频"
+                      : exportSettings.format === "webm"
+                        ? transparentExport
+                          ? "· VP9 Alpha · 导出后验证透明像素"
+                          : "· VP9 · 纯色背景"
+                        : "· H.264 · 纯色背景"}
                   </small>
                 )}
               </div>
