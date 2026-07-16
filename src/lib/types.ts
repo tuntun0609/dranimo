@@ -57,6 +57,24 @@ export interface ProjectV1 {
   brush: BrushSettings;
 }
 
+export interface ProjectSummary {
+  id: string;
+  name: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface StoredProjectV1 extends ProjectSummary {
+  storageVersion: 1;
+  project: ProjectV1;
+}
+
+export interface ProjectIndexV1 {
+  version: 1;
+  activeProjectId: string;
+  projectIds: string[];
+}
+
 export interface ExportSettings {
   format: ExportFormat;
   background?: BackgroundMode;
@@ -91,12 +109,12 @@ export const CANVAS_PRESETS: Record<
 
 export const DEFAULT_BRUSH: BrushSettings = {
   color: "#000000",
-  size: 16,
+  size: 15,
   opacity: 1,
   thinning: 0,
   smoothing: 0.61,
   streamline: 0.5,
-  simulatePressure: true,
+  simulatePressure: false,
   startTaper: 0,
   endTaper: 0,
   capStart: true,

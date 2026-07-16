@@ -8,10 +8,8 @@ import {
   Eraser,
   Expand,
   Eye,
-  FileImage,
   Gauge,
   Layers3,
-  MoreHorizontal,
   Pause,
   Pencil,
   Play,
@@ -24,7 +22,15 @@ import {
   Volume2,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import ProjectSwitcher from "@/components/ProjectSwitcher";
 import {
   canvasToPng,
   createExportCanvas,
@@ -37,7 +43,15 @@ import {
   projectToSvg,
   renderProjectFrame,
 } from "@/lib/export";
-import { loadProject, saveProject } from "@/lib/persistence";
+import {
+  createProject as createStoredProject,
+  deleteProject as deleteStoredProject,
+  duplicateProject as duplicateStoredProject,
+  loadProjectById,
+  loadProjectLibrary,
+  renameProject as renameStoredProject,
+  saveProject,
+} from "@/lib/persistence";
 import { buildPlaybackSchedule, getVisibleStrokes } from "@/lib/playback";
 import { pointHitsStroke, strokePath } from "@/lib/stroke-geometry";
 import {
@@ -46,6 +60,7 @@ import {
   createDefaultProject,
   type ExportSettings,
   type PlaybackMode,
+  type ProjectSummary,
   type ProjectV1,
   type StrokePoint,
   type StrokeRecord,
@@ -78,24 +93,41 @@ function appendDistinctPoints(current: StrokePoint[], samples: StrokePoint[]) {
   return next;
 }
 
+function exportFileBaseName(name: string) {
+  const cleaned = name
+    .trim()
+    .replace(/[<>:"/\\|?*]/g, "-")
+    .replace(/\s+/g, " ")
+    .slice(0, 80);
+  return cleaned || "dranimo-animation";
+}
+
 function IconButton({
   label,
   active,
   disabled,
+  className,
+  controls,
+  expanded,
   onClick,
   children,
 }: {
   label: string;
   active?: boolean;
   disabled?: boolean;
+  className?: string;
+  controls?: string;
+  expanded?: boolean;
   onClick: () => void;
   children: React.ReactNode;
 }) {
   return (
     <button
       type="button"
-      className={`icon-button ${active ? "active" : ""}`}
+      className={`icon-button ${active ? "active" : ""} ${className ?? ""}`}
       aria-label={label}
+      aria-controls={controls}
+      aria-expanded={expanded}
       title={label}
       disabled={disabled}
       onClick={onClick}
@@ -130,6 +162,8 @@ function Section({
 
 export default function DranimoEditor() {
   const [project, setProject] = useState<ProjectV1>(createDefaultProject);
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [activeProjectId, setActiveProjectId] = useState("");
   const [undo, setUndo] = useState<StrokeRecord[][]>([]);
   const [redo, setRedo] = useState<StrokeRecord[][]>([]);
   const [tool, setTool] = useState<Tool>("brush");
@@ -139,6 +173,8 @@ export default function DranimoEditor() {
   const [currentTime, setCurrentTime] = useState(0);
   const [playbackError, setPlaybackError] = useState("");
   const [loadError, setLoadError] = useState("");
+  const [projectReady, setProjectReady] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
@@ -151,14 +187,19 @@ export default function DranimoEditor() {
     padding: 32,
     fps: 30,
   });
-  const [stageSize, setStageSize] = useState({ width: 640, height: 640 });
+  const [stageSize, setStageSize] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [saveFailed, setSaveFailed] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
   const drawingRef = useRef<StrokePoint[]>([]);
   const activePointerIdRef = useRef<number | null>(null);
   const animationRef = useRef<number | null>(null);
   const startRef = useRef(0);
   const playbackTimeRef = useRef(0);
+  const autosaveTimerRef = useRef<number | null>(null);
   const wasLoaded = useRef(false);
 
   const schedule = useMemo(
@@ -172,8 +213,9 @@ export default function DranimoEditor() {
   const transparentExport =
     getExportBackground(exportSettings) === "transparent";
   const canvasDisplaySize = useMemo(() => {
-    const availableWidth = Math.max(1, stageSize.width - 40);
-    const availableHeight = Math.max(1, stageSize.height - 40);
+    if (!stageSize) return null;
+    const availableWidth = Math.max(1, stageSize.width);
+    const availableHeight = Math.max(1, stageSize.height);
     const scale = Math.min(
       availableWidth / project.canvas.width,
       availableHeight / project.canvas.height,
@@ -222,42 +264,90 @@ export default function DranimoEditor() {
     return strokePath(preview, drawing, false);
   }, [drawing, project.brush, tool]);
 
-  useEffect(() => {
-    let mounted = true;
-    loadProject().then(({ project: stored, error }) => {
-      if (!mounted) return;
-      if (stored) setProject(stored);
-      if (error) setLoadError(error);
-      wasLoaded.current = true;
-    });
-    return () => {
-      mounted = false;
-    };
+  const persistProject = useCallback((projectId: string, next: ProjectV1) => {
+    try {
+      const result = saveProject(projectId, next);
+      setProjects(result.projects);
+      setSavedAt(Date.now());
+      setSaveFailed(false);
+      return true;
+    } catch (error) {
+      setSaveFailed(true);
+      setLoadError(error instanceof Error ? error.message : "项目保存失败");
+      return false;
+    }
+  }, []);
+
+  useLayoutEffect(() => {
+    const {
+      project: stored,
+      projects: storedProjects,
+      activeProjectId: storedActiveProjectId,
+      error,
+    } = loadProjectLibrary();
+    setProject(stored);
+    setProjects(storedProjects);
+    setActiveProjectId(storedActiveProjectId);
+    if (error) setLoadError(error);
+    wasLoaded.current = true;
+    setProjectReady(true);
   }, []);
 
   useEffect(() => {
-    if (!wasLoaded.current) return;
+    if (!wasLoaded.current || !activeProjectId) return;
     const timer = window.setTimeout(() => {
-      saveProject(project).then(() => setSavedAt(Date.now()));
+      autosaveTimerRef.current = null;
+      persistProject(activeProjectId, project);
     }, 300);
-    return () => window.clearTimeout(timer);
-  }, [project]);
+    autosaveTimerRef.current = timer;
+    return () => {
+      window.clearTimeout(timer);
+      if (autosaveTimerRef.current === timer) autosaveTimerRef.current = null;
+    };
+  }, [activeProjectId, persistProject, project]);
 
-  useEffect(() => {
-    if (!stageRef.current) return;
-    const observer = new ResizeObserver(([entry]) =>
-      setStageSize({
-        width: entry.contentRect.width,
-        height: entry.contentRect.height,
-      }),
-    );
-    observer.observe(stageRef.current);
+  useLayoutEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const measureStage = () => {
+      const style = window.getComputedStyle(stage);
+      const horizontalPadding =
+        Number.parseFloat(style.paddingLeft) +
+        Number.parseFloat(style.paddingRight);
+      const verticalPadding =
+        Number.parseFloat(style.paddingTop) +
+        Number.parseFloat(style.paddingBottom);
+      const next = {
+        width: Math.max(1, stage.clientWidth - horizontalPadding),
+        height: Math.max(1, stage.clientHeight - verticalPadding),
+      };
+      setStageSize((current) =>
+        current &&
+        current.width === next.width &&
+        current.height === next.height
+          ? current
+          : next,
+      );
+    };
+    measureStage();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measureStage);
+    observer.observe(stage);
     return () => observer.disconnect();
   }, []);
 
   useEffect(() => {
     playbackTimeRef.current = currentTime;
   }, [currentTime]);
+
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSettingsOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [settingsOpen]);
 
   useEffect(() => {
     // 每帧更新 currentTime 不能重启这个 effect，否则 RAF 的计时基准会不断回退。
@@ -287,13 +377,113 @@ export default function DranimoEditor() {
     };
   }, [isPreviewing, schedule]);
 
+  const resetTransientState = () => {
+    if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    animationRef.current = null;
+    activePointerIdRef.current = null;
+    drawingRef.current = [];
+    playbackTimeRef.current = 0;
+    setDrawing([]);
+    setUndo([]);
+    setRedo([]);
+    setCurrentTime(0);
+    setIsPreviewing(false);
+    setShowPlaybackFrame(false);
+    setPlaybackError("");
+    setExportOpen(false);
+    setExportError("");
+    setSettingsOpen(false);
+  };
+
+  const flushCurrentProject = () => {
+    if (autosaveTimerRef.current) {
+      window.clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
+    }
+    if (!activeProjectId) return true;
+    return persistProject(activeProjectId, project);
+  };
+
+  const applyProjectSelection = (
+    selection: ReturnType<typeof createStoredProject>,
+  ) => {
+    setProject(selection.project);
+    setProjects(selection.projects);
+    setActiveProjectId(selection.activeProjectId);
+    setSavedAt(Date.now());
+    setSaveFailed(false);
+    resetTransientState();
+  };
+
+  const handleCreateProject = () => {
+    if (!flushCurrentProject()) return false;
+    try {
+      applyProjectSelection(createStoredProject());
+      return true;
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "新建项目失败");
+      return false;
+    }
+  };
+
+  const handleSelectProject = (projectId: string) => {
+    if (projectId === activeProjectId) return true;
+    if (!flushCurrentProject()) return false;
+    try {
+      applyProjectSelection(loadProjectById(projectId));
+      return true;
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "打开项目失败");
+      return false;
+    }
+  };
+
+  const handleRenameProject = (projectId: string, name: string) => {
+    if (!flushCurrentProject()) return false;
+    try {
+      setProjects(renameStoredProject(projectId, name));
+      setSavedAt(Date.now());
+      return true;
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "重命名项目失败");
+      return false;
+    }
+  };
+
+  const handleDuplicateProject = (projectId: string) => {
+    if (!flushCurrentProject()) return false;
+    try {
+      applyProjectSelection(duplicateStoredProject(projectId));
+      return true;
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "复制项目失败");
+      return false;
+    }
+  };
+
+  const handleDeleteProject = (projectId: string) => {
+    if (!flushCurrentProject()) return false;
+    try {
+      const selection = deleteStoredProject(projectId);
+      if (projectId === activeProjectId) {
+        applyProjectSelection(selection);
+      } else {
+        setProjects(selection.projects);
+        setSaveFailed(false);
+      }
+      return true;
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "删除项目失败");
+      return false;
+    }
+  };
+
   const commitStrokes = (next: StrokeRecord[]) => {
     setUndo((items) => [...items, project.strokes]);
     setRedo([]);
-    setProject((current) => ({ ...current, strokes: next }));
-    saveProject({ ...project, strokes: next }).then(() =>
-      setSavedAt(Date.now()),
-    );
+    const nextProject = { ...project, strokes: next };
+    setProject(nextProject);
+    if (activeProjectId) persistProject(activeProjectId, nextProject);
     setCurrentTime(0);
     setIsPreviewing(false);
     setShowPlaybackFrame(false);
@@ -462,6 +652,9 @@ export default function DranimoEditor() {
         : null,
     );
     setPlaybackError("");
+    const fileBaseName = exportFileBaseName(
+      projects.find((item) => item.id === activeProjectId)?.name ?? "",
+    );
     try {
       if (exportSettings.format === "svg") {
         const svg = projectToSvg(
@@ -472,7 +665,7 @@ export default function DranimoEditor() {
         );
         downloadBlob(
           new Blob([svg], { type: "image/svg+xml" }),
-          "dranimo-animation.svg",
+          `${fileBaseName}.svg`,
         );
       } else if (
         exportSettings.format === "webm" ||
@@ -489,7 +682,7 @@ export default function DranimoEditor() {
           onProgress: (progress) =>
             setExportProgress(Math.round(progress * 100)),
         });
-        downloadBlob(blob, `dranimo-animation.${exportSettings.format}`);
+        downloadBlob(blob, `${fileBaseName}.${exportSettings.format}`);
       } else {
         const canvas = createExportCanvas(dimensions);
         const context = canvas.getContext("2d");
@@ -501,7 +694,7 @@ export default function DranimoEditor() {
           schedule.duration,
           exportSettings,
         );
-        downloadBlob(await canvasToPng(canvas), "dranimo-animation.png");
+        downloadBlob(await canvasToPng(canvas), `${fileBaseName}.png`);
       }
       setExportOpen(false);
     } catch (error) {
@@ -527,10 +720,17 @@ export default function DranimoEditor() {
           <span>dranimo</span>
           <span className="beta">MVP</span>
         </div>
-        <div className="topbar-center">
-          <span className="project-name">untitled animation</span>
-          <span className="saved-state">{savedAt ? "已保存" : "本地项目"}</span>
-        </div>
+        <ProjectSwitcher
+          projects={projects}
+          activeProjectId={activeProjectId}
+          savedState={saveFailed ? "未保存" : savedAt ? "已保存" : "本地项目"}
+          disabled={!projectReady || exporting}
+          onCreate={handleCreateProject}
+          onSelect={handleSelectProject}
+          onRename={handleRenameProject}
+          onDuplicate={handleDuplicateProject}
+          onDelete={handleDeleteProject}
+        />
         <div className="topbar-actions">
           <IconButton
             label="帮助"
@@ -541,10 +741,14 @@ export default function DranimoEditor() {
             <CircleHelp size={18} />
           </IconButton>
           <IconButton
-            label="更多"
-            onClick={() => setLoadError("Dranimo 项目保存在当前浏览器中")}
+            label={settingsOpen ? "关闭设置" : "打开设置"}
+            className="settings-toggle"
+            controls="editor-settings"
+            expanded={settingsOpen}
+            active={settingsOpen}
+            onClick={() => setSettingsOpen((open) => !open)}
           >
-            <MoreHorizontal size={18} />
+            <Settings2 size={18} />
           </IconButton>
           <button
             type="button"
@@ -627,56 +831,58 @@ export default function DranimoEditor() {
             </div>
           </div>
           <div className="stage" ref={stageRef}>
-            <div
-              className="canvas-wrap"
-              style={{
-                width: canvasDisplaySize.width,
-                height: canvasDisplaySize.height,
-              }}
-            >
-              <svg
-                className={`drawing-surface ${tool === "eraser" ? "eraser-cursor" : "brush-cursor"}`}
-                viewBox={`0 0 ${project.canvas.width} ${project.canvas.height}`}
-                aria-label="绘图画布"
-                onPointerDown={handlePointerDown}
-                onPointerMove={handlePointerMove}
-                onPointerUp={finishDrawing}
-                onPointerCancel={finishDrawing}
+            {projectReady && canvasDisplaySize && (
+              <div
+                className="canvas-wrap"
+                style={{
+                  width: canvasDisplaySize.width,
+                  height: canvasDisplaySize.height,
+                }}
               >
-                <title>绘图画布</title>
-                <rect
-                  width={project.canvas.width}
-                  height={project.canvas.height}
-                  fill={project.canvas.backgroundColor}
-                />
-                {visiblePaths.map(({ id, path, color, opacity }) => (
-                  <path
-                    key={id}
-                    d={path}
-                    fill={color}
-                    fillOpacity={opacity}
-                    pointerEvents="none"
+                <svg
+                  className={`drawing-surface ${tool === "eraser" ? "eraser-cursor" : "brush-cursor"}`}
+                  viewBox={`0 0 ${project.canvas.width} ${project.canvas.height}`}
+                  aria-label="绘图画布"
+                  onPointerDown={handlePointerDown}
+                  onPointerMove={handlePointerMove}
+                  onPointerUp={finishDrawing}
+                  onPointerCancel={finishDrawing}
+                >
+                  <title>绘图画布</title>
+                  <rect
+                    width={project.canvas.width}
+                    height={project.canvas.height}
+                    fill={project.canvas.backgroundColor}
                   />
-                ))}
-                {drawingPath && (
-                  <path
-                    d={drawingPath}
-                    fill={project.brush.color}
-                    fillOpacity={project.brush.opacity}
-                    pointerEvents="none"
-                  />
-                )}
-              </svg>
-              {!project.strokes.length && !drawing.length && (
-                <div className="canvas-empty">
-                  <div className="empty-icon">
-                    <Pencil size={22} />
+                  {visiblePaths.map(({ id, path, color, opacity }) => (
+                    <path
+                      key={id}
+                      d={path}
+                      fill={color}
+                      fillOpacity={opacity}
+                      pointerEvents="none"
+                    />
+                  ))}
+                  {drawingPath && (
+                    <path
+                      d={drawingPath}
+                      fill={project.brush.color}
+                      fillOpacity={project.brush.opacity}
+                      pointerEvents="none"
+                    />
+                  )}
+                </svg>
+                {!project.strokes.length && !drawing.length && (
+                  <div className="canvas-empty">
+                    <div className="empty-icon">
+                      <Pencil size={22} />
+                    </div>
+                    <p>从这里开始绘制</p>
+                    <span className="empty-hint">按住并拖动鼠标或触控板</span>
                   </div>
-                  <p>从这里开始绘制</p>
-                  <span className="empty-hint">按住并拖动鼠标或触控板</span>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </div>
           <div className="playback-bar">
             <div className="playback-controls">
@@ -758,7 +964,25 @@ export default function DranimoEditor() {
           )}
         </section>
 
-        <aside className="settings-panel">
+        {settingsOpen && (
+          <button
+            type="button"
+            className="settings-backdrop"
+            aria-label="关闭设置"
+            onClick={() => setSettingsOpen(false)}
+          />
+        )}
+
+        <aside
+          id="editor-settings"
+          className={`settings-panel ${settingsOpen ? "open" : ""}`}
+        >
+          <div className="mobile-panel-header">
+            <span>设置</span>
+            <IconButton label="关闭设置" onClick={() => setSettingsOpen(false)}>
+              <X size={18} />
+            </IconButton>
+          </div>
           <div className="panel-scroll">
             <Section title="画笔" icon={<Pencil size={16} />}>
               <div className="color-row">
@@ -1012,25 +1236,6 @@ export default function DranimoEditor() {
               {schedule.warning && (
                 <div className="warning-note">{schedule.warning}</div>
               )}
-            </Section>
-            <Section
-              title="导出"
-              icon={<Download size={16} />}
-              defaultOpen={false}
-            >
-              <div className="export-mini">
-                <div>
-                  <FileImage size={18} />
-                  <span>PNG / SVG / WebM</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setExportOpen(true)}
-                  disabled={!project.strokes.length}
-                >
-                  设置
-                </button>
-              </div>
             </Section>
           </div>
           <div className="panel-footer">
