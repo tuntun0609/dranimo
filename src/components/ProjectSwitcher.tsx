@@ -166,6 +166,7 @@ export default function ProjectSwitcher({
                     key={project.id}
                     variant={active ? "muted" : "outline"}
                     size="sm"
+                    className="relative"
                     render={<li />}
                   >
                     <ItemMedia variant="icon">
@@ -204,27 +205,31 @@ export default function ProjectSwitcher({
                         </FieldGroup>
                       </ItemContent>
                     ) : (
-                      <ItemContent className="min-w-0">
-                        <ItemTitle className="max-w-full">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            className="h-auto min-w-0 justify-start px-0 py-0 text-left"
-                            disabled={disabled}
-                            onClick={() => {
-                              if (active || onSelect(project.id))
-                                setOpen(false);
-                            }}
-                          >
+                      <>
+                        <ItemContent className="min-w-0">
+                          <ItemTitle className="max-w-full">
                             <span className="truncate">{project.name}</span>
-                          </Button>
-                        </ItemTitle>
-                        <ItemDescription>
-                          更新于 {formatUpdatedAt(project.updatedAt)}
-                        </ItemDescription>
-                      </ItemContent>
+                          </ItemTitle>
+                          <ItemDescription>
+                            更新于 {formatUpdatedAt(project.updatedAt)}
+                          </ItemDescription>
+                        </ItemContent>
+                        <button
+                          type="button"
+                          className="absolute inset-0 rounded-lg outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                          aria-label={
+                            active
+                              ? `${project.name}（当前画布）`
+                              : `打开 ${project.name}`
+                          }
+                          disabled={disabled}
+                          onClick={() => {
+                            if (active || onSelect(project.id)) setOpen(false);
+                          }}
+                        />
+                      </>
                     )}
-                    <ItemActions>
+                    <ItemActions className="relative z-10">
                       {editing ? (
                         <>
                           <Button

@@ -46,7 +46,9 @@ function AlertDialogContent({
 }) {
   return (
     <AlertDialogPortal>
-      <AlertDialogOverlay />
+      {/* Alert dialogs are blocking by nature, so force the backdrop even when
+          nested inside another dialog (Base UI hides nested backdrops by default). */}
+      <AlertDialogOverlay forceRender />
       <AlertDialogPrimitive.Popup
         data-slot="alert-dialog-content"
         data-size={size}

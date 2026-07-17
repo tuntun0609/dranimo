@@ -55,6 +55,7 @@ describe("project persistence", () => {
     assert.equal(initial.projects.length, 1);
     assert.equal(initial.projects[0].name, "untitled animation");
     assert.equal(initial.activeProjectId, initial.projects[0].id);
+    assert.equal(initial.project.canvas.backgroundColor, "#ffffff");
 
     const restored = loadProjectLibrary(storage);
     assert.deepEqual(restored.project, initial.project);
