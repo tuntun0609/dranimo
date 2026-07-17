@@ -112,7 +112,7 @@ export function SettingsPanelContent({
             className="flex-wrap items-center gap-2.5"
           >
             <ToggleGroup
-              className="flex flex-wrap items-center gap-2"
+              className="flex flex-wrap items-center gap-2 py-1"
               value={[project.brush.color]}
               onValueChange={(values) => {
                 const color = values[0];
@@ -129,7 +129,6 @@ export function SettingsPanelContent({
                 >
                   {project.brush.color === color && (
                     <Check
-                      data-icon="inline-start"
                       color={
                         color === "#ffffff"
                           ? "var(--foreground)"
