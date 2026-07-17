@@ -8,8 +8,20 @@ import {
   Pencil,
   Plus,
   Trash2,
+  X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,18 +31,22 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemMedia,
+  ItemTitle,
+} from "@/components/ui/item";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ProjectSummary } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 interface ProjectSwitcherProps {
   projects: ProjectSummary[];
@@ -107,199 +123,227 @@ export default function ProjectSwitcher({
   };
 
   return (
-    <div className="project-switcher topbar-center">
-      <DropdownMenu open={open} onOpenChange={handleOpenChange}>
-        <DropdownMenuTrigger
+    <div className="relative flex min-w-0 flex-1 items-center justify-center gap-2 max-sm:justify-end max-sm:gap-0">
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogTrigger
           render={
             <Button
               variant="ghost"
-              className="project-switcher-trigger"
-              aria-label="打开项目列表"
-              title={activeProject?.name ?? "项目"}
+              className="max-w-[min(420px,100%)] min-w-0 max-sm:size-8 max-sm:px-0"
+              aria-label="打开画布管理"
+              title={activeProject?.name ?? "画布"}
               disabled={disabled}
             />
           }
         >
-          <span className="project-switcher-desktop">
-            <span className="project-switcher-name">
+          <span className="inline-flex min-w-0 items-center gap-1.5 max-sm:hidden">
+            <span className="truncate">
               {activeProject?.name ?? "untitled animation"}
             </span>
-            <ChevronDown size={14} />
+            <ChevronDown data-icon="inline-end" />
           </span>
-          <FolderOpen className="project-switcher-mobile" size={18} />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="center" className="project-menu">
-          <div className="project-menu-head">
-            <DropdownMenuGroup>
-              <DropdownMenuLabel className="project-menu-label">
-                <strong>项目</strong>
-                <span>{projects.length} 个本地项目</span>
-              </DropdownMenuLabel>
-            </DropdownMenuGroup>
+          <FolderOpen
+            data-icon="inline-start"
+            className="hidden max-sm:block"
+          />
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>画布管理</DialogTitle>
+            <DialogDescription>
+              {projects.length} 个本地画布，数据仅保存在当前浏览器中。
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea
+            className={cn("pr-2", projects.length > 5 && "h-[min(60vh,28rem)]")}
+          >
+            <ItemGroup className="gap-2">
+              {projects.map((project) => {
+                const active = project.id === activeProjectId;
+                const editing = project.id === editingId;
+                return (
+                  <Item
+                    key={project.id}
+                    variant={active ? "muted" : "outline"}
+                    size="sm"
+                    render={<li />}
+                  >
+                    <ItemMedia variant="icon">
+                      {active ? <Check /> : <FolderOpen />}
+                    </ItemMedia>
+                    {editing ? (
+                      <ItemContent className="min-w-0">
+                        <FieldGroup className="gap-1">
+                          <Field>
+                            <FieldLabel
+                              htmlFor={`project-name-${project.id}`}
+                              className="sr-only"
+                            >
+                              画布名称
+                            </FieldLabel>
+                            <Input
+                              id={`project-name-${project.id}`}
+                              value={draftName}
+                              maxLength={60}
+                              autoFocus
+                              onChange={(event) =>
+                                setDraftName(event.target.value)
+                              }
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                  event.preventDefault();
+                                  commitRename();
+                                }
+                                if (event.key === "Escape") {
+                                  event.preventDefault();
+                                  setEditingId(null);
+                                }
+                              }}
+                            />
+                          </Field>
+                        </FieldGroup>
+                      </ItemContent>
+                    ) : (
+                      <ItemContent className="min-w-0">
+                        <ItemTitle className="max-w-full">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="h-auto min-w-0 justify-start px-0 py-0 text-left"
+                            disabled={disabled}
+                            onClick={() => {
+                              if (active || onSelect(project.id))
+                                setOpen(false);
+                            }}
+                          >
+                            <span className="truncate">{project.name}</span>
+                          </Button>
+                        </ItemTitle>
+                        <ItemDescription>
+                          更新于 {formatUpdatedAt(project.updatedAt)}
+                        </ItemDescription>
+                      </ItemContent>
+                    )}
+                    <ItemActions>
+                      {editing ? (
+                        <>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-xs"
+                            aria-label="保存画布名称"
+                            onClick={commitRename}
+                          >
+                            <Check data-icon="inline-start" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-xs"
+                            aria-label="取消重命名"
+                            onClick={() => setEditingId(null)}
+                          >
+                            <X data-icon="inline-start" />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-xs"
+                            aria-label={`重命名 ${project.name}`}
+                            title="重命名"
+                            disabled={disabled}
+                            onClick={() => startRename(project)}
+                          >
+                            <Pencil data-icon="inline-start" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-xs"
+                            aria-label={`复制 ${project.name}`}
+                            title="复制"
+                            disabled={disabled}
+                            onClick={() => {
+                              if (onDuplicate(project.id)) setOpen(false);
+                            }}
+                          >
+                            <Copy data-icon="inline-start" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-xs"
+                            aria-label={`删除 ${project.name}`}
+                            title="删除"
+                            disabled={disabled}
+                            onClick={() => setDeleteTarget(project)}
+                          >
+                            <Trash2 data-icon="inline-start" />
+                          </Button>
+                        </>
+                      )}
+                    </ItemActions>
+                  </Item>
+                );
+              })}
+            </ItemGroup>
+          </ScrollArea>
+          <DialogFooter>
             <Button
               type="button"
-              variant="secondary"
-              size="sm"
-              className="project-new-button"
+              variant="default"
               disabled={disabled}
               onClick={() => {
                 if (onCreate()) setOpen(false);
               }}
             >
-              <Plus size={15} />
-              新建
+              <Plus data-icon="inline-start" />
+              新建画布
             </Button>
-          </div>
-          <DropdownMenuSeparator />
-          <div className="project-list">
-            {projects.map((project) => {
-              const active = project.id === activeProjectId;
-              const editing = project.id === editingId;
-              return (
-                <div
-                  className={`project-row ${active ? "active" : ""}`}
-                  key={project.id}
+          </DialogFooter>
+          <AlertDialog
+            open={Boolean(deleteTarget)}
+            onOpenChange={handleDeleteDialogChange}
+          >
+            <AlertDialogContent size="sm">
+              <AlertDialogHeader>
+                <AlertDialogMedia className="bg-destructive/10 text-destructive">
+                  <Trash2 />
+                </AlertDialogMedia>
+                <AlertDialogTitle>删除画布？</AlertDialogTitle>
+                <AlertDialogDescription>
+                  “{deleteTarget?.name}”及其全部笔画将从当前浏览器中永久删除。
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel variant="outline">取消</AlertDialogCancel>
+                <AlertDialogAction
+                  type="button"
+                  variant="destructive"
+                  onClick={() => {
+                    if (!deleteTarget || !onDelete(deleteTarget.id)) return;
+                    setDeleteTarget(null);
+                    setOpen(false);
+                  }}
                 >
-                  {editing ? (
-                    <Input
-                      className="project-rename-input"
-                      value={draftName}
-                      maxLength={60}
-                      aria-label="项目名称"
-                      onChange={(event) => setDraftName(event.target.value)}
-                      onBlur={commitRename}
-                      onKeyDown={(event) => {
-                        // DropdownMenu has typeahead keyboard handling; do not let it
-                        // consume Latin letters or digits while editing a project name.
-                        event.stopPropagation();
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          commitRename();
-                        }
-                        if (event.key === "Escape") {
-                          event.preventDefault();
-                          setEditingId(null);
-                        }
-                      }}
-                      onKeyUp={(event) => event.stopPropagation()}
-                    />
-                  ) : (
-                    <DropdownMenuItem
-                      className="project-row-main"
-                      disabled={disabled}
-                      onClick={(event) => {
-                        const success = active || onSelect(project.id);
-                        if (!success) event.preventDefault();
-                      }}
-                    >
-                      <span className="project-active-mark">
-                        {active && <Check size={13} />}
-                      </span>
-                      <span className="project-row-copy">
-                        <strong>{project.name}</strong>
-                        <small>
-                          更新于 {formatUpdatedAt(project.updatedAt)}
-                        </small>
-                      </span>
-                    </DropdownMenuItem>
-                  )}
-                  {!editing && (
-                    <div className="project-row-actions">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-xs"
-                        aria-label={`重命名 ${project.name}`}
-                        title="重命名"
-                        disabled={disabled}
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          startRename(project);
-                        }}
-                      >
-                        <Pencil size={14} />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-xs"
-                        aria-label={`复制 ${project.name}`}
-                        title="复制"
-                        disabled={disabled}
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          if (onDuplicate(project.id)) setOpen(false);
-                        }}
-                      >
-                        <Copy size={14} />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-xs"
-                        aria-label={`删除 ${project.name}`}
-                        title="删除"
-                        disabled={disabled}
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          setDeleteTarget(project);
-                        }}
-                      >
-                        <Trash2 size={14} />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </DropdownMenuContent>
-      </DropdownMenu>
+                  <Trash2 data-icon="inline-start" />
+                  删除画布
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </DialogContent>
+      </Dialog>
 
       <Badge
         variant={savedState === "未保存" ? "destructive" : "secondary"}
-        className="saved-state"
+        className="text-[11px] max-sm:hidden"
       >
         {savedState}
       </Badge>
-
-      <Dialog
-        open={Boolean(deleteTarget)}
-        onOpenChange={handleDeleteDialogChange}
-      >
-        <DialogContent className="confirm-modal" showCloseButton={false}>
-          <DialogHeader>
-            <DialogTitle>删除项目？</DialogTitle>
-            <DialogDescription>
-              “{deleteTarget?.name}”及其全部笔画将从当前浏览器中删除。
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setDeleteTarget(null)}
-            >
-              取消
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={() => {
-                if (!deleteTarget || !onDelete(deleteTarget.id)) return;
-                setDeleteTarget(null);
-                setOpen(false);
-              }}
-            >
-              <Trash2 size={15} />
-              删除项目
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

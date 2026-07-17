@@ -126,7 +126,7 @@ export const DEFAULT_CANVAS: CanvasSettings = {
   width: 1080,
   height: 1080,
   background: "solid",
-  backgroundColor: "#f8f6f0",
+  backgroundColor: "#ffffff",
 };
 
 export const DEFAULT_PLAYBACK: PlaybackSettings = {

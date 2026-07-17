@@ -1,15 +1,11 @@
 "use client";
 
 import {
-  Check,
-  ChevronDown,
   CircleHelp,
   Download,
   Eraser,
   Expand,
   Eye,
-  Gauge,
-  Layers3,
   Pause,
   Pencil,
   Play,
@@ -23,6 +19,8 @@ import {
   X,
 } from "lucide-react";
 import {
+  cloneElement,
+  isValidElement,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -31,6 +29,51 @@ import {
   useState,
 } from "react";
 import ProjectSwitcher from "@/components/ProjectSwitcher";
+import { SettingsPanelContent } from "@/components/SettingsPanelContent";
+import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Progress } from "@/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { Slider } from "@/components/ui/slider";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   canvasToPng,
   createExportCanvas,
@@ -59,23 +102,13 @@ import {
   CANVAS_PRESETS,
   createDefaultProject,
   type ExportSettings,
-  type PlaybackMode,
   type ProjectSummary,
   type ProjectV1,
   type StrokePoint,
   type StrokeRecord,
   type Tool,
 } from "@/lib/types";
-
-const COLORS = [
-  "#000000",
-  "#d86a49",
-  "#3478c4",
-  "#d8a23c",
-  "#8d5ba8",
-  "#e64e72",
-  "#ffffff",
-];
+import { cn } from "@/lib/utils";
 
 function appendDistinctPoints(current: StrokePoint[], samples: StrokePoint[]) {
   let next = current;
@@ -121,42 +154,52 @@ function IconButton({
   onClick: () => void;
   children: React.ReactNode;
 }) {
+  const icon = isValidElement<{
+    size?: number;
+    "data-icon"?: string;
+  }>(children)
+    ? cloneElement(children, {
+        "data-icon": "inline-start",
+        size: undefined,
+      })
+    : children;
+
   return (
-    <button
-      type="button"
-      className={`icon-button ${active ? "active" : ""} ${className ?? ""}`}
-      aria-label={label}
-      aria-controls={controls}
-      aria-expanded={expanded}
-      title={label}
-      disabled={disabled}
-      onClick={onClick}
-    >
-      {children}
-    </button>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "size-[34px] rounded-[9px] text-muted-foreground",
+              active && "bg-accent text-foreground",
+              className,
+            )}
+            aria-label={label}
+            aria-controls={controls}
+            aria-expanded={expanded}
+            disabled={disabled}
+            onClick={onClick}
+          />
+        }
+      >
+        {icon}
+      </TooltipTrigger>
+      <TooltipContent side="right">{label}</TooltipContent>
+    </Tooltip>
   );
 }
 
-function Section({
-  title,
-  icon,
-  children,
-  defaultOpen = true,
-}: {
-  title: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-  defaultOpen?: boolean;
-}) {
+function PanelFooter() {
   return (
-    <details className="settings-section" open={defaultOpen}>
-      <summary>
-        {icon}
-        <span>{title}</span>
-        <ChevronDown size={15} />
-      </summary>
-      <div className="section-body">{children}</div>
-    </details>
+    <div className="flex min-h-[43px] items-center gap-[7px] border-t border-border px-[18px] text-[10px] text-muted-foreground [&_svg]:size-4">
+      <Volume2 />
+      <span>本地优先 · 自动保存</span>
+      <span className="flex-1" />
+      <Settings2 />
+    </div>
   );
 }
 
@@ -706,19 +749,17 @@ export default function DranimoEditor() {
   };
 
   const ratioLabel = CANVAS_PRESETS[project.canvas.ratio].label;
-  const progress = schedule.duration
-    ? Math.min(100, (currentTime / schedule.duration) * 100)
-    : 0;
-
   return (
-    <main className="editor-shell">
-      <header className="topbar">
-        <div className="brand">
-          <div className="brand-mark">
+    <main className="flex h-screen min-h-screen flex-col overflow-hidden bg-background">
+      <header className="z-[3] flex h-16 flex-none items-center border-b border-border bg-[color-mix(in_oklab,var(--card)_88%,transparent)] px-[22px] backdrop-blur-lg max-[640px]:px-3">
+        <div className="flex min-w-[240px] items-center gap-[9px] text-[18px] font-bold tracking-[-0.04em] max-[980px]:min-w-[170px] max-[640px]:min-w-0">
+          <div className="grid size-7 -rotate-[7deg] place-items-center rounded-[9px] bg-accent text-foreground">
             <Sparkles size={16} />
           </div>
           <span>dranimo</span>
-          <span className="beta">MVP</span>
+          <span className="rounded-[5px] border border-input px-1.5 py-[3px] text-[9px] font-bold tracking-[0.08em] text-muted-foreground">
+            MVP
+          </span>
         </div>
         <ProjectSwitcher
           projects={projects}
@@ -731,9 +772,10 @@ export default function DranimoEditor() {
           onDuplicate={handleDuplicateProject}
           onDelete={handleDeleteProject}
         />
-        <div className="topbar-actions">
+        <div className="flex min-w-[240px] items-center justify-end gap-[7px] max-[640px]:min-w-0">
           <IconButton
             label="帮助"
+            className="max-[640px]:hidden"
             onClick={() =>
               setLoadError("提示：在画布上拖动即可绘制，橡皮擦会整笔删除")
             }
@@ -742,29 +784,30 @@ export default function DranimoEditor() {
           </IconButton>
           <IconButton
             label={settingsOpen ? "关闭设置" : "打开设置"}
-            className="settings-toggle"
-            controls="editor-settings"
+            className="hidden max-[980px]:flex"
+            controls="editor-settings-mobile"
             expanded={settingsOpen}
             active={settingsOpen}
             onClick={() => setSettingsOpen((open) => !open)}
           >
             <Settings2 size={18} />
           </IconButton>
-          <button
+          <Button
             type="button"
-            className="export-top-button"
+            variant="default"
+            className="h-[35px] rounded-[9px] px-3.5 text-xs font-bold max-[640px]:px-2.5"
             onClick={() => setExportOpen(true)}
             disabled={!project.strokes.length}
           >
-            <Download size={16} />
+            <Download data-icon="inline-start" />
             导出
-          </button>
+          </Button>
         </div>
       </header>
 
-      <div className="workspace">
-        <aside className="left-rail">
-          <div className="rail-group">
+      <div className="grid min-h-0 flex-1 grid-cols-[60px_minmax(0,1fr)_310px] max-[980px]:grid-cols-[55px_minmax(0,1fr)] max-[640px]:grid-cols-[50px_minmax(0,1fr)]">
+        <aside className="flex flex-col items-center gap-[9px] border-r border-border bg-sidebar py-4">
+          <div className="flex flex-col gap-[5px]">
             <IconButton
               label="画笔"
               active={tool === "brush"}
@@ -780,8 +823,8 @@ export default function DranimoEditor() {
               <Eraser size={19} />
             </IconButton>
           </div>
-          <div className="rail-divider" />
-          <div className="rail-group">
+          <Separator className="my-[5px] w-7" />
+          <div className="flex flex-col gap-[5px]">
             <IconButton
               label="撤销"
               disabled={!undo.length}
@@ -797,7 +840,7 @@ export default function DranimoEditor() {
               <Redo2 size={18} />
             </IconButton>
           </div>
-          <div className="rail-bottom">
+          <div className="mt-auto">
             <IconButton
               label="清空画布"
               disabled={!project.strokes.length}
@@ -808,39 +851,47 @@ export default function DranimoEditor() {
           </div>
         </aside>
 
-        <section className="canvas-area">
-          <div className="canvas-toolbar">
-            <div className="tool-context">
+        <section className="relative flex min-h-0 min-w-0 flex-col bg-muted">
+          <div className="flex h-12 items-center justify-between border-b border-[color-mix(in_oklab,var(--border)_75%,transparent)] px-5 text-[11px] text-muted-foreground max-[640px]:px-3">
+            <div className="flex items-center gap-2 font-bold text-foreground">
               <span
-                className="tool-dot"
+                className="size-[9px] rounded-full shadow-[0_0_0_3px_color-mix(in_oklab,var(--foreground)_8%,transparent)]"
                 style={{
                   background:
-                    tool === "eraser" ? "#d86a49" : project.brush.color,
+                    tool === "eraser"
+                      ? "var(--destructive)"
+                      : project.brush.color,
                 }}
               />
               <span>{tool === "eraser" ? "整笔橡皮擦" : "画笔"}</span>
-              <span className="toolbar-hint">
+              <span className="font-normal text-muted-foreground">
                 {tool === "eraser" ? "拖动删除整笔" : `${project.brush.size}px`}
               </span>
             </div>
-            <div className="canvas-meta">
-              <span>{ratioLabel}</span>
-              <span>
+            <div className="flex items-center gap-3.5">
+              <span className="max-[640px]:hidden">{ratioLabel}</span>
+              <span className="border-l border-input pl-3.5">
                 {project.canvas.width} × {project.canvas.height}
               </span>
             </div>
           </div>
-          <div className="stage" ref={stageRef}>
+          <div
+            className="grid min-h-0 flex-1 place-items-center overflow-hidden p-5 max-[640px]:p-2.5"
+            ref={stageRef}
+          >
             {projectReady && canvasDisplaySize && (
               <div
-                className="canvas-wrap"
+                className="relative max-h-full max-w-full overflow-hidden rounded-[3px] bg-card shadow-[var(--shadow),0_0_0_1px_color-mix(in_oklab,var(--foreground)_7%,transparent)]"
                 style={{
                   width: canvasDisplaySize.width,
                   height: canvasDisplaySize.height,
                 }}
               >
                 <svg
-                  className={`drawing-surface ${tool === "eraser" ? "eraser-cursor" : "brush-cursor"}`}
+                  className={cn(
+                    "absolute inset-0 block size-full touch-none select-none",
+                    tool === "eraser" ? "cursor-cell" : "cursor-crosshair",
+                  )}
                   viewBox={`0 0 ${project.canvas.width} ${project.canvas.height}`}
                   aria-label="绘图画布"
                   onPointerDown={handlePointerDown}
@@ -873,19 +924,28 @@ export default function DranimoEditor() {
                   )}
                 </svg>
                 {!project.strokes.length && !drawing.length && (
-                  <div className="canvas-empty">
-                    <div className="empty-icon">
-                      <Pencil size={22} />
-                    </div>
-                    <p>从这里开始绘制</p>
-                    <span className="empty-hint">按住并拖动鼠标或触控板</span>
-                  </div>
+                  <Empty className="pointer-events-none absolute inset-0 justify-center text-muted-foreground [&_[data-slot=empty-header]]:gap-0">
+                    <EmptyHeader>
+                      <EmptyMedia
+                        variant="icon"
+                        className="mb-3.5 size-12 rounded-[14px] border border-dashed border-border bg-transparent text-muted-foreground"
+                      >
+                        <Pencil />
+                      </EmptyMedia>
+                      <EmptyTitle className="text-sm font-bold text-foreground">
+                        从这里开始绘制
+                      </EmptyTitle>
+                      <EmptyDescription className="mt-1.5 text-[11px]">
+                        按住并拖动鼠标或触控板
+                      </EmptyDescription>
+                    </EmptyHeader>
+                  </Empty>
                 )}
               </div>
             )}
           </div>
-          <div className="playback-bar">
-            <div className="playback-controls">
+          <div className="flex min-h-[73px] items-center gap-[15px] border-t border-border bg-[color-mix(in_oklab,var(--card)_92%,transparent)] px-5 pt-[11px] pb-[9px] max-[640px]:gap-2 max-[640px]:px-2.5">
+            <div className="flex min-w-[166px] items-center gap-1.5 max-[640px]:min-w-[130px]">
               <IconButton
                 label="重播"
                 onClick={() => {
@@ -896,9 +956,11 @@ export default function DranimoEditor() {
               >
                 <RotateCcw size={17} />
               </IconButton>
-              <button
+              <Button
                 type="button"
-                className="play-button"
+                variant="default"
+                size="icon-lg"
+                className="size-9 rounded-full"
                 aria-label={isPreviewing ? "暂停" : "播放"}
                 onClick={() =>
                   isPreviewing ? setIsPreviewing(false) : startPlayback()
@@ -907,33 +969,33 @@ export default function DranimoEditor() {
                 {isPreviewing ? (
                   <Pause size={18} fill="currentColor" />
                 ) : (
-                  <Play size={18} fill="currentColor" />
+                  <Play fill="currentColor" />
                 )}
-              </button>
-              <span className="time-readout">
+              </Button>
+              <span className="ml-[3px] text-[11px] text-muted-foreground tabular-nums">
                 {(currentTime / 1000).toFixed(2)} /{" "}
                 {(schedule.duration / 1000).toFixed(2)}s
               </span>
             </div>
-            <div className="timeline">
-              <input
-                type="range"
-                min="0"
+            <div className="min-w-[100px] flex-1">
+              <Slider
+                min={0}
                 max={Math.max(1, schedule.duration)}
                 value={currentTime}
-                onChange={(event) => {
+                aria-label="时间轴"
+                onValueChange={(value) => {
                   setIsPreviewing(false);
                   setShowPlaybackFrame(true);
-                  setCurrentTime(Number(event.target.value));
+                  setCurrentTime(Number(value));
                 }}
-                style={{ "--progress": `${progress}%` } as React.CSSProperties}
+                className="block w-full [&_[data-slot=slider-thumb]]:size-2.5 [&_[data-slot=slider-thumb]]:border-primary [&_[data-slot=slider-thumb]]:bg-card [&_[data-slot=slider-track]]:h-1 [&_[data-slot=slider-track]]:bg-muted [&_[data-slot=slider-range]]:bg-primary"
               />
-              <div className="timeline-labels">
+              <div className="mt-1.5 flex justify-between text-[9px] text-muted-foreground tabular-nums">
                 <span>0s</span>
                 <span>{(schedule.duration / 1000).toFixed(1)}s</span>
               </div>
             </div>
-            <div className="playback-extra">
+            <div className="flex min-w-[120px] items-center justify-end gap-[7px] max-[640px]:min-w-0">
               <IconButton
                 label={showPlaybackFrame ? "编辑完整画布" : "预览当前时间点"}
                 active={!showPlaybackFrame}
@@ -944,7 +1006,9 @@ export default function DranimoEditor() {
               >
                 {showPlaybackFrame ? <Pencil size={17} /> : <Eye size={17} />}
               </IconButton>
-              <span className="stroke-count">{project.strokes.length} 笔</span>
+              <span className="rounded-md bg-muted px-2 py-[5px] text-[10px] text-muted-foreground max-[640px]:hidden">
+                {project.strokes.length} 笔
+              </span>
               <IconButton
                 label="全屏画布"
                 onClick={() => stageRef.current?.requestFullscreen?.()}
@@ -954,469 +1018,293 @@ export default function DranimoEditor() {
             </div>
           </div>
           {playbackError && (
-            <div className="inline-alert">
-              <X size={15} />
-              <span>{playbackError}</span>
-              <button type="button" onClick={() => setPlaybackError("")}>
-                <X size={13} />
-              </button>
-            </div>
+            <Alert
+              variant="destructive"
+              className="absolute bottom-[88px] left-1/2 flex w-auto -translate-x-1/2 items-center gap-[7px] border-[color-mix(in_oklab,var(--destructive)_30%,var(--border))] bg-[color-mix(in_oklab,var(--destructive)_8%,var(--card))] px-[11px] py-[9px] text-[11px] text-destructive shadow-[0_8px_24px_color-mix(in_oklab,var(--destructive)_10%,transparent)] max-[640px]:right-2.5 max-[640px]:left-2.5 max-[640px]:translate-x-0"
+            >
+              <X />
+              <AlertDescription>{playbackError}</AlertDescription>
+              <AlertAction>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label="关闭提示"
+                  onClick={() => setPlaybackError("")}
+                >
+                  <X />
+                </Button>
+              </AlertAction>
+            </Alert>
           )}
         </section>
 
-        {settingsOpen && (
-          <button
-            type="button"
-            className="settings-backdrop"
-            aria-label="关闭设置"
-            onClick={() => setSettingsOpen(false)}
-          />
-        )}
-
         <aside
-          id="editor-settings"
-          className={`settings-panel ${settingsOpen ? "open" : ""}`}
+          id="editor-settings-desktop"
+          className="flex min-h-0 flex-col border-l border-border bg-sidebar max-[980px]:hidden"
         >
-          <div className="mobile-panel-header">
-            <span>设置</span>
-            <IconButton label="关闭设置" onClick={() => setSettingsOpen(false)}>
-              <X size={18} />
-            </IconButton>
-          </div>
-          <div className="panel-scroll">
-            <Section title="画笔" icon={<Pencil size={16} />}>
-              <div className="color-row">
-                {COLORS.map((color) => (
-                  <button
-                    type="button"
-                    key={color}
-                    aria-label={`颜色 ${color}`}
-                    className={`color-swatch ${project.brush.color === color ? "selected" : ""}`}
-                    style={{ background: color }}
-                    onClick={() => updateBrush({ color })}
-                  >
-                    {project.brush.color === color && (
-                      <Check
-                        size={14}
-                        color={color === "#ffffff" ? "#000000" : "white"}
-                      />
-                    )}
-                  </button>
-                ))}
-                <label className="custom-color">
-                  <input
-                    type="color"
-                    value={project.brush.color}
-                    onChange={(event) =>
-                      updateBrush({ color: event.target.value })
-                    }
-                  />
-                </label>
-              </div>
-              <label className="field-label">
-                <span className="field-value">
-                  粗细 <output>{project.brush.size}px</output>
-                </span>
-                <input
-                  type="range"
-                  min="1"
-                  max="80"
-                  value={project.brush.size}
-                  onChange={(event) =>
-                    updateBrush({ size: Number(event.target.value) })
-                  }
-                />
-              </label>
-              <label className="field-label">
-                <span className="field-value">
-                  透明度{" "}
-                  <output>{Math.round(project.brush.opacity * 100)}%</output>
-                </span>
-                <input
-                  type="range"
-                  min="0.05"
-                  max="1"
-                  step="0.05"
-                  value={project.brush.opacity}
-                  onChange={(event) =>
-                    updateBrush({ opacity: Number(event.target.value) })
-                  }
-                />
-              </label>
-              <details className="advanced">
-                <summary>
-                  高级设置 <ChevronDown size={14} />
-                </summary>
-                <div className="advanced-grid">
-                  <label>
-                    Thinning
-                    <input
-                      type="range"
-                      min="-1"
-                      max="1"
-                      step="0.05"
-                      value={project.brush.thinning}
-                      onChange={(event) =>
-                        updateBrush({ thinning: Number(event.target.value) })
-                      }
-                    />
-                  </label>
-                  <label>
-                    Smoothing
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      value={project.brush.smoothing}
-                      onChange={(event) =>
-                        updateBrush({ smoothing: Number(event.target.value) })
-                      }
-                    />
-                  </label>
-                  <label>
-                    Streamline
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      value={project.brush.streamline}
-                      onChange={(event) =>
-                        updateBrush({ streamline: Number(event.target.value) })
-                      }
-                    />
-                  </label>
-                  <label>
-                    压力模拟
-                    <select
-                      value={project.brush.simulatePressure ? "yes" : "no"}
-                      onChange={(event) =>
-                        updateBrush({
-                          simulatePressure: event.target.value === "yes",
-                        })
-                      }
-                    >
-                      <option value="yes">开启</option>
-                      <option value="no">关闭</option>
-                    </select>
-                  </label>
-                </div>
-              </details>
-            </Section>
-            <Section title="画布" icon={<Layers3 size={16} />}>
-              <div className="ratio-grid">
-                {Object.entries(CANVAS_PRESETS).map(([key, preset]) => (
-                  <button
-                    type="button"
-                    key={key}
-                    className={project.canvas.ratio === key ? "selected" : ""}
-                    onClick={() =>
-                      changeRatio(key as keyof typeof CANVAS_PRESETS)
-                    }
-                  >
-                    <span className={`ratio-icon ratio-${key}`} />
-                    <strong>{preset.label}</strong>
-                    <small>
-                      {preset.width}×{preset.height}
-                    </small>
-                  </button>
-                ))}
-              </div>
-              <label className="background-color">
-                <span>背景色</span>
-                <input
-                  type="color"
-                  value={project.canvas.backgroundColor}
-                  onChange={(event) =>
-                    setProject((current) => ({
-                      ...current,
-                      canvas: {
-                        ...current.canvas,
-                        backgroundColor: event.target.value,
-                      },
-                    }))
-                  }
-                />
-                <code>{project.canvas.backgroundColor}</code>
-              </label>
-            </Section>
-            <Section title="动画节奏" icon={<Gauge size={16} />}>
-              <div className="mode-tabs">
-                {(["real", "fixed", "total"] as PlaybackMode[]).map((mode) => (
-                  <button
-                    type="button"
-                    key={mode}
-                    className={project.playback.mode === mode ? "selected" : ""}
-                    onClick={() =>
-                      setProject((current) => ({
-                        ...current,
-                        playback: { ...current.playback, mode },
-                      }))
-                    }
-                  >
-                    {mode === "real"
-                      ? "真实速度"
-                      : mode === "fixed"
-                        ? "固定速度"
-                        : "总时长"}
-                  </button>
-                ))}
-              </div>
-              {project.playback.mode === "fixed" && (
-                <label className="field-label">
-                  <span className="field-value">
-                    速度 <output>{project.playback.fixedSpeed} px/s</output>
-                  </span>
-                  <input
-                    type="range"
-                    min="100"
-                    max="1600"
-                    step="50"
-                    value={project.playback.fixedSpeed}
-                    onChange={(event) =>
-                      setProject((current) => ({
-                        ...current,
-                        playback: {
-                          ...current.playback,
-                          fixedSpeed: Number(event.target.value),
-                        },
-                      }))
-                    }
-                  />
-                </label>
-              )}
-              {project.playback.mode === "total" && (
-                <label className="field-label">
-                  <span className="field-value">
-                    总时长{" "}
-                    <output>
-                      {(project.playback.totalDuration / 1000).toFixed(1)}s
-                    </output>
-                  </span>
-                  <input
-                    type="range"
-                    min="500"
-                    max="60000"
-                    step="100"
-                    value={project.playback.totalDuration}
-                    onChange={(event) =>
-                      setProject((current) => ({
-                        ...current,
-                        playback: {
-                          ...current.playback,
-                          totalDuration: Number(event.target.value),
-                        },
-                      }))
-                    }
-                  />
-                </label>
-              )}
-              <label className="field-label">
-                <span className="field-value">
-                  笔画间隔 <output>{project.playback.strokeGap}ms</output>
-                </span>
-                <input
-                  type="range"
-                  min="0"
-                  max="500"
-                  step="10"
-                  value={project.playback.strokeGap}
-                  onChange={(event) =>
-                    setProject((current) => ({
-                      ...current,
-                      playback: {
-                        ...current.playback,
-                        strokeGap: Number(event.target.value),
-                      },
-                    }))
-                  }
-                />
-              </label>
-              {schedule.warning && (
-                <div className="warning-note">{schedule.warning}</div>
-              )}
-            </Section>
-          </div>
-          <div className="panel-footer">
-            <Volume2 size={15} />
-            <span>本地优先 · 自动保存</span>
-            <span className="footer-spacer" />
-            <Settings2 size={15} />
-          </div>
+          <SettingsPanelContent
+            project={project}
+            schedule={schedule}
+            updateBrush={updateBrush}
+            changeRatio={changeRatio}
+            setProject={setProject}
+          />
+          <PanelFooter />
         </aside>
+        <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
+          <SheetContent
+            id="editor-settings-mobile"
+            side="right"
+            className="w-[min(320px,calc(100vw-50px))] max-w-none gap-0 bg-sidebar p-0"
+            showCloseButton={false}
+          >
+            <SheetHeader className="sr-only">
+              <SheetTitle>设置</SheetTitle>
+              <SheetDescription>编辑画笔、画布与动画参数</SheetDescription>
+            </SheetHeader>
+            <div className="flex min-h-[52px] flex-none items-center justify-between border-b border-border pt-0 pr-3 pb-0 pl-[18px] text-[13px] font-bold">
+              <span>设置</span>
+              <SheetClose
+                render={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="关闭设置"
+                  />
+                }
+              >
+                <X data-icon="inline-start" />
+                <span className="sr-only">关闭设置</span>
+              </SheetClose>
+            </div>
+            <SettingsPanelContent
+              project={project}
+              schedule={schedule}
+              updateBrush={updateBrush}
+              changeRatio={changeRatio}
+              setProject={setProject}
+            />
+            <PanelFooter />
+          </SheetContent>
+        </Sheet>
       </div>
 
       {loadError && (
-        <div className="toast">
-          <span>{loadError}</span>
-          <button type="button" onClick={() => setLoadError("")}>
-            <X size={15} />
-          </button>
-        </div>
+        <Alert
+          variant="destructive"
+          className="fixed right-[26px] bottom-[25px] z-[5] flex w-auto items-center gap-3.5 border-input bg-card px-[13px] py-[11px] text-[11px] text-foreground shadow-[var(--shadow)]"
+        >
+          <AlertDescription>{loadError}</AlertDescription>
+          <AlertAction>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label="关闭提示"
+              onClick={() => setLoadError("")}
+            >
+              <X />
+            </Button>
+          </AlertAction>
+        </Alert>
       )}
-      {exportOpen && (
-        <div className="modal-backdrop" role="presentation">
-          <div className="export-modal" role="dialog" aria-modal="true">
-            <div className="modal-head">
-              <div>
-                <h2>导出动画</h2>
-                <p>输出与你在画布中看到的轮廓保持一致</p>
-              </div>
-              <button
-                type="button"
-                className="close-button"
-                onClick={() => setExportOpen(false)}
-                disabled={exporting}
-              >
-                <X size={19} />
-              </button>
-            </div>
-            <div className="export-form">
-              <div className="format-options">
-                {(["png", "svg", "webm", "mov", "mp4"] as const).map(
-                  (format) => (
-                    <button
-                      type="button"
-                      key={format}
-                      className={
-                        exportSettings.format === format ? "selected" : ""
-                      }
-                      onClick={() =>
-                        setExportSettings((current) => ({
-                          ...current,
-                          format,
-                          ...(format === "mov"
-                            ? { background: "transparent" }
-                            : format === "mp4"
-                              ? { background: "solid" }
-                              : {}),
-                        }))
-                      }
-                    >
-                      <span className="format-badge">
-                        {format.toUpperCase()}
-                      </span>
-                      <span>
-                        {format === "png"
-                          ? "静态图片"
-                          : format === "svg"
-                            ? "矢量图形"
-                            : format === "mov"
-                              ? "剪辑视频"
-                              : "动画视频"}
-                      </span>
-                      {format === "mov" && (
-                        <small>ProRes 4444 Alpha · 大文件</small>
-                      )}
-                      {format === "webm" && (
-                        <small>
-                          {transparentExport ? "VP9 Alpha · 小文件" : "VP9"}
-                        </small>
-                      )}
-                      {format === "mp4" && <small>H.264 · 不透明</small>}
-                    </button>
-                  ),
-                )}
-              </div>
-              <div className="form-grid">
-                <label>
-                  <span>背景</span>
-                  <select
-                    value={getExportBackground(exportSettings)}
-                    disabled={
-                      exportSettings.format === "mov" ||
-                      exportSettings.format === "mp4"
-                    }
-                    onChange={(event) =>
+      <Dialog
+        open={exportOpen}
+        onOpenChange={(open) => {
+          if (!exporting) setExportOpen(open);
+        }}
+      >
+        <DialogContent
+          className="w-[min(100%,490px)] gap-0 overflow-hidden p-0 sm:max-w-[490px]"
+          showCloseButton={false}
+        >
+          <DialogHeader className="flex flex-col items-start justify-between border-b border-border px-6 pt-[23px] pb-[18px] [&_[data-slot=dialog-description]]:mt-1.5 [&_[data-slot=dialog-description]]:text-[11px] [&_[data-slot=dialog-description]]:text-muted-foreground [&_[data-slot=dialog-title]]:text-[18px] [&_[data-slot=dialog-title]]:tracking-[-0.03em]">
+            <DialogTitle>导出动画</DialogTitle>
+            <DialogDescription>
+              输出与你在画布中看到的轮廓保持一致
+            </DialogDescription>
+          </DialogHeader>
+          <div className="px-6 pt-[19px] pb-5 max-[640px]:px-[18px]">
+            <ToggleGroup
+              className="grid w-full grid-cols-3 gap-2"
+              value={[exportSettings.format]}
+              onValueChange={(values) => {
+                const format = values[0] as
+                  | ExportSettings["format"]
+                  | undefined;
+                if (!format) return;
+                setExportSettings((current) => ({
+                  ...current,
+                  format,
+                  ...(format === "mov"
+                    ? { background: "transparent" }
+                    : format === "mp4"
+                      ? { background: "solid" }
+                      : {}),
+                }));
+              }}
+            >
+              {(["png", "svg", "webm", "mov", "mp4"] as const).map((format) => (
+                <ToggleGroupItem
+                  key={format}
+                  value={format}
+                  className="relative flex h-auto min-h-[78px] min-w-0 flex-col items-start gap-[7px] rounded-[9px] border border-border bg-card p-[11px] text-left whitespace-normal text-muted-foreground hover:bg-card aria-pressed:border-ring aria-pressed:bg-accent aria-pressed:text-foreground [&_small]:text-[9px] [&_small]:text-muted-foreground"
+                >
+                  <span className="text-[10px] font-extrabold tracking-[0.05em] text-foreground">
+                    {format.toUpperCase()}
+                  </span>
+                  <span>
+                    {format === "png"
+                      ? "静态图片"
+                      : format === "svg"
+                        ? "矢量图形"
+                        : format === "mov"
+                          ? "剪辑视频"
+                          : "动画视频"}
+                  </span>
+                  {format === "mov" && (
+                    <small>ProRes 4444 Alpha · 大文件</small>
+                  )}
+                  {format === "webm" && (
+                    <small>
+                      {transparentExport ? "VP9 Alpha · 小文件" : "VP9"}
+                    </small>
+                  )}
+                  {format === "mp4" && <small>H.264 · 不透明</small>}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+            <FieldGroup className="mt-[22px] grid grid-cols-2 gap-x-3 gap-y-[15px] [&_[data-slot=field-label]_output]:float-right [&_[data-slot=field-label]_output]:font-bold [&_[data-slot=field-label]_output]:text-foreground [&_[data-slot=field-label]_output]:tabular-nums [&_[data-slot=field-label]]:text-[11px] [&_[data-slot=field-label]]:text-muted-foreground [&_[data-slot=field]]:flex [&_[data-slot=field]]:flex-col [&_[data-slot=field]]:gap-2 [&_[data-slot=field]]:text-[11px] [&_[data-slot=field]]:text-muted-foreground">
+              <Field>
+                <FieldLabel>背景</FieldLabel>
+                <Select
+                  value={getExportBackground(exportSettings)}
+                  disabled={
+                    exportSettings.format === "mov" ||
+                    exportSettings.format === "mp4"
+                  }
+                  onValueChange={(value) =>
+                    setExportSettings((current) => ({
+                      ...current,
+                      background: value as ExportSettings["background"],
+                    }))
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="solid">
+                        纯色（编辑器背景色）
+                      </SelectItem>
+                      <SelectItem value="transparent">透明</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field>
+                <FieldLabel>画布范围</FieldLabel>
+                <Select
+                  value={exportSettings.crop}
+                  onValueChange={(value) =>
+                    setExportSettings((current) => ({
+                      ...current,
+                      crop: value as ExportSettings["crop"],
+                    }))
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="full">完整画布</SelectItem>
+                      <SelectItem value="fit">自适应裁切</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field>
+                <FieldLabel>导出倍率</FieldLabel>
+                <Select
+                  value={String(exportSettings.scale)}
+                  onValueChange={(value) =>
+                    setExportSettings((current) => ({
+                      ...current,
+                      scale: Number(value) as ExportSettings["scale"],
+                    }))
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="1">1×</SelectItem>
+                      <SelectItem value="2">2×</SelectItem>
+                      <SelectItem value="3">3×</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
+              {exportSettings.crop === "fit" && (
+                <Field>
+                  <FieldLabel>
+                    留白 <output>{exportSettings.padding}px</output>
+                  </FieldLabel>
+                  <Slider
+                    min={0}
+                    max={160}
+                    step={4}
+                    value={exportSettings.padding}
+                    aria-label="留白"
+                    onValueChange={(value) =>
                       setExportSettings((current) => ({
                         ...current,
-                        background: event.target
-                          .value as ExportSettings["background"],
+                        padding: Number(value),
+                      }))
+                    }
+                  />
+                </Field>
+              )}
+              {(exportSettings.format === "webm" ||
+                exportSettings.format === "mov" ||
+                exportSettings.format === "mp4") && (
+                <Field>
+                  <FieldLabel>帧率</FieldLabel>
+                  <Select
+                    value={String(exportSettings.fps)}
+                    onValueChange={(value) =>
+                      setExportSettings((current) => ({
+                        ...current,
+                        fps: Number(value),
                       }))
                     }
                   >
-                    <option value="solid">纯色（编辑器背景色）</option>
-                    <option value="transparent">透明</option>
-                  </select>
-                </label>
-                <label>
-                  <span>画布范围</span>
-                  <select
-                    value={exportSettings.crop}
-                    onChange={(event) =>
-                      setExportSettings((current) => ({
-                        ...current,
-                        crop: event.target.value as ExportSettings["crop"],
-                      }))
-                    }
-                  >
-                    <option value="full">完整画布</option>
-                    <option value="fit">自适应裁切</option>
-                  </select>
-                </label>
-                <label>
-                  <span>导出倍率</span>
-                  <select
-                    value={exportSettings.scale}
-                    onChange={(event) =>
-                      setExportSettings((current) => ({
-                        ...current,
-                        scale: Number(
-                          event.target.value,
-                        ) as ExportSettings["scale"],
-                      }))
-                    }
-                  >
-                    <option value="1">1×</option>
-                    <option value="2">2×</option>
-                    <option value="3">3×</option>
-                  </select>
-                </label>
-                {exportSettings.crop === "fit" && (
-                  <label>
-                    <span>
-                      留白 <output>{exportSettings.padding}px</output>
-                    </span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="160"
-                      step="4"
-                      value={exportSettings.padding}
-                      onChange={(event) =>
-                        setExportSettings((current) => ({
-                          ...current,
-                          padding: Number(event.target.value),
-                        }))
-                      }
-                    />
-                  </label>
-                )}
-                {(exportSettings.format === "webm" ||
-                  exportSettings.format === "mov" ||
-                  exportSettings.format === "mp4") && (
-                  <label>
-                    <span>帧率</span>
-                    <select
-                      value={exportSettings.fps}
-                      onChange={(event) =>
-                        setExportSettings((current) => ({
-                          ...current,
-                          fps: Number(event.target.value),
-                        }))
-                      }
-                    >
-                      <option value="24">24 fps</option>
-                      <option value="30">30 fps</option>
-                      <option value="60">60 fps</option>
-                    </select>
-                  </label>
-                )}
-              </div>
-              <div className="export-summary">
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value="24">24 fps</SelectItem>
+                        <SelectItem value="30">30 fps</SelectItem>
+                        <SelectItem value="60">60 fps</SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
+              )}
+            </FieldGroup>
+            <Card
+              size="sm"
+              className="mt-[21px] bg-[color-mix(in_oklab,var(--muted)_35%,var(--card))]"
+            >
+              <CardContent className="flex items-center gap-2 text-[11px] text-muted-foreground [&_small]:text-[9px] [&_small]:text-muted-foreground">
                 <span>预计尺寸</span>
-                <strong>
+                <strong className="ml-auto text-xs text-foreground">
                   {dimensions.width} × {dimensions.height}px
                 </strong>
                 {(exportSettings.format === "webm" ||
@@ -1432,43 +1320,70 @@ export default function DranimoEditor() {
                         : "· H.264 · 纯色背景"}
                   </small>
                 )}
-              </div>
-              {exportError && (
-                <div className="export-error" role="alert">
-                  <X size={15} />
-                  <span className="export-error-message">{exportError}</span>
-                  <button type="button" onClick={() => setExportError("")}>
-                    <X size={13} />
-                  </button>
+              </CardContent>
+            </Card>
+            {exportError && (
+              <Alert
+                variant="destructive"
+                className="mt-3.5 flex items-center gap-[7px] border-[color-mix(in_oklab,var(--destructive)_30%,var(--border))] bg-[color-mix(in_oklab,var(--destructive)_8%,var(--card))] px-[11px] py-[9px] text-[11px] text-destructive"
+              >
+                <X />
+                <AlertDescription className="flex-1 text-destructive">
+                  {exportError}
+                </AlertDescription>
+                <AlertAction>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label="关闭错误"
+                    onClick={() => setExportError("")}
+                  >
+                    <X />
+                  </Button>
+                </AlertAction>
+              </Alert>
+            )}
+            {exporting && exportProgress !== null && (
+              <div
+                className="mt-3.5 flex flex-col gap-2 border-t border-border pt-3.5"
+                aria-live="polite"
+              >
+                <div className="flex justify-between text-[11px] text-muted-foreground [&_output]:font-bold [&_output]:text-foreground">
+                  <span>正在编码视频</span>
+                  <output>{exportProgress}%</output>
                 </div>
-              )}
-            </div>
-            <div className="modal-actions">
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => setExportOpen(false)}
-                disabled={exporting}
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                className="primary-button"
-                onClick={handleExport}
-                disabled={exporting || !project.strokes.length}
-              >
-                {exporting
-                  ? exportProgress === null
-                    ? "导出中…"
-                    : `导出中 ${exportProgress}%`
-                  : `导出 ${exportSettings.format.toUpperCase()}`}
-                <Download size={16} />
-              </button>
-            </div>
+                <Progress value={exportProgress} aria-label="导出进度" />
+              </div>
+            )}
           </div>
-        </div>
-      )}
+          <DialogFooter className="m-0 flex justify-end gap-2 border-t border-border bg-sidebar px-6 py-3.5 max-[640px]:px-[18px]">
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-[35px] px-3.5 text-xs text-muted-foreground"
+              onClick={() => setExportOpen(false)}
+              disabled={exporting}
+            >
+              取消
+            </Button>
+            <Button
+              type="button"
+              variant="default"
+              className="h-[35px] px-3.5 text-xs font-bold"
+              onClick={handleExport}
+              disabled={exporting || !project.strokes.length}
+            >
+              {exporting
+                ? exportProgress === null
+                  ? "导出中…"
+                  : `导出中 ${exportProgress}%`
+                : `导出 ${exportSettings.format.toUpperCase()}`}
+              <Download data-icon="inline-end" />
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

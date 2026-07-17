@@ -1,0 +1,1 @@
+- [UI shadcn refactor](ui-shadcn-refactor.md) — in-progress: move bespoke globals.css into colocated Tailwind utilities w/ semantic tokens
