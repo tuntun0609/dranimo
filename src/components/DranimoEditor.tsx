@@ -76,6 +76,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
+  eraserTrailPath,
+  pruneTrailPoints,
+  type TrailPoint,
+} from "@/lib/eraser-trail";
+import {
   canvasToPng,
   createExportCanvas,
   downloadBlob,
@@ -212,6 +217,8 @@ export default function DranimoEditor() {
   const [redo, setRedo] = useState<StrokeRecord[][]>([]);
   const [tool, setTool] = useState<Tool>("brush");
   const [drawing, setDrawing] = useState<StrokePoint[]>([]);
+  const [eraserTrail, setEraserTrail] = useState("");
+  const [eraserHits, setEraserHits] = useState<Set<string>>(() => new Set());
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [showPlaybackFrame, setShowPlaybackFrame] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -239,6 +246,10 @@ export default function DranimoEditor() {
   const [saveFailed, setSaveFailed] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
   const drawingRef = useRef<StrokePoint[]>([]);
+  const eraserTrailRef = useRef<TrailPoint[]>([]);
+  const eraserTrailSizeRef = useRef(12);
+  const eraserHitsRef = useRef<Set<string>>(new Set());
+  const eraserFrameRef = useRef<number | null>(null);
   const activePointerIdRef = useRef<number | null>(null);
   const animationRef = useRef<number | null>(null);
   const startRef = useRef(0);
@@ -322,6 +333,17 @@ export default function DranimoEditor() {
     }
   }, []);
 
+  const clearEraserState = useCallback(() => {
+    if (eraserFrameRef.current !== null) {
+      cancelAnimationFrame(eraserFrameRef.current);
+      eraserFrameRef.current = null;
+    }
+    eraserTrailRef.current = [];
+    eraserHitsRef.current = new Set();
+    setEraserTrail("");
+    setEraserHits(new Set());
+  }, []);
+
   useLayoutEffect(() => {
     const {
       project: stored,
@@ -384,6 +406,13 @@ export default function DranimoEditor() {
     playbackTimeRef.current = currentTime;
   }, [currentTime]);
 
+  // Leaving the eraser mid-sweep should drop the trail and un-dim everything.
+  useEffect(() => {
+    if (tool !== "eraser") clearEraserState();
+  }, [clearEraserState, tool]);
+
+  useEffect(() => clearEraserState, [clearEraserState]);
+
   useEffect(() => {
     if (!settingsOpen) return;
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -427,6 +456,7 @@ export default function DranimoEditor() {
     activePointerIdRef.current = null;
     drawingRef.current = [];
     playbackTimeRef.current = 0;
+    clearEraserState();
     setDrawing([]);
     setUndo([]);
     setRedo([]);
@@ -578,6 +608,53 @@ export default function DranimoEditor() {
     });
   };
 
+  // RAF loop that ages the eraser trail out; it re-renders the shrinking comet
+  // every frame and stops once every point has faded past the trail window.
+  const renderEraserFrame = useCallback(() => {
+    const now = performance.now();
+    const pruned = pruneTrailPoints(eraserTrailRef.current, now);
+    eraserTrailRef.current = pruned;
+    setEraserTrail(
+      pruned.length >= 2
+        ? eraserTrailPath(pruned, now, { size: eraserTrailSizeRef.current })
+        : "",
+    );
+    eraserFrameRef.current =
+      pruned.length >= 2 ? requestAnimationFrame(renderEraserFrame) : null;
+  }, []);
+
+  const ensureEraserFrame = useCallback(() => {
+    if (eraserFrameRef.current === null) {
+      eraserFrameRef.current = requestAnimationFrame(renderEraserFrame);
+    }
+  }, [renderEraserFrame]);
+
+  const pushEraserTrail = (points: StrokePoint[]) => {
+    const now = performance.now();
+    const additions = points.map(({ x, y }) => ({ x, y, t: now }));
+    eraserTrailRef.current = pruneTrailPoints(
+      [...eraserTrailRef.current, ...additions],
+      now,
+    );
+    ensureEraserFrame();
+  };
+
+  // Excalidraw-style eraser: mark whatever the pointer sweeps over as pending
+  // deletion (dimmed on canvas) and only commit the removal on pointer up.
+  const accumulateEraserHits = (points: StrokePoint[]) => {
+    const hits = eraserHitsRef.current;
+    const tolerance = project.brush.size * 0.65;
+    let changed = false;
+    for (const stroke of project.strokes) {
+      if (hits.has(stroke.id)) continue;
+      if (points.some((point) => pointHitsStroke(point, stroke, tolerance))) {
+        hits.add(stroke.id);
+        changed = true;
+      }
+    }
+    if (changed) setEraserHits(new Set(hits));
+  };
+
   const handlePointerDown = (event: React.PointerEvent<SVGSVGElement>) => {
     if (event.button !== 0) return;
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -587,10 +664,16 @@ export default function DranimoEditor() {
     const points = pointsFromEvent(event);
     drawingRef.current = points;
     setDrawing(points);
+    if (tool === "eraser") {
+      eraserTrailSizeRef.current = Math.max(8, project.brush.size * 0.8);
+      pushEraserTrail(points);
+      accumulateEraserHits(points);
+    }
   };
 
   const handlePointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
     if (activePointerIdRef.current !== event.pointerId) return;
+    const previousLength = drawingRef.current.length;
     const points = appendDistinctPoints(
       drawingRef.current,
       pointsFromEvent(
@@ -601,6 +684,10 @@ export default function DranimoEditor() {
     if (points === drawingRef.current) return;
     drawingRef.current = points;
     setDrawing(points);
+    if (tool === "eraser") {
+      pushEraserTrail(points.slice(previousLength));
+      accumulateEraserHits(points);
+    }
   };
 
   const finishDrawing = (event: React.PointerEvent<SVGSVGElement>) => {
@@ -615,17 +702,16 @@ export default function DranimoEditor() {
     );
     drawingRef.current = [];
     setDrawing([]);
-    if (points.length === 0) return;
     if (tool === "eraser") {
-      const next = project.strokes.filter(
-        (stroke) =>
-          !points.some((point) =>
-            pointHitsStroke(point, stroke, project.brush.size * 0.65),
-          ),
-      );
+      // Fold in the final samples, then delete everything the sweep marked.
+      accumulateEraserHits(points);
+      const hits = eraserHitsRef.current;
+      const next = project.strokes.filter((stroke) => !hits.has(stroke.id));
+      clearEraserState();
       if (next.length !== project.strokes.length) commitStrokes(next);
       return;
     }
+    if (points.length === 0) return;
     const normalized = points.map((point, index) => ({
       ...point,
       t: index === 0 ? 0 : point.t - points[0].t,
@@ -904,21 +990,33 @@ export default function DranimoEditor() {
                     height={project.canvas.height}
                     fill={project.canvas.backgroundColor}
                   />
-                  {visiblePaths.map(({ id, path, color, opacity }) => (
-                    <path
-                      key={id}
-                      d={path}
-                      fill={color}
-                      fillOpacity={opacity}
-                      pointerEvents="none"
-                    />
-                  ))}
+                  {visiblePaths.map(({ id, path, color, opacity }) => {
+                    const erasing = eraserHits.has(id);
+                    return (
+                      <path
+                        key={id}
+                        d={path}
+                        fill={color}
+                        fillOpacity={erasing ? opacity * 0.25 : opacity}
+                        pointerEvents="none"
+                        style={{ transition: "fill-opacity 90ms ease-out" }}
+                      />
+                    );
+                  })}
                   {drawingPath && (
                     <path
                       d={drawingPath}
                       fill={project.brush.color}
                       fillOpacity={project.brush.opacity}
                       pointerEvents="none"
+                    />
+                  )}
+                  {eraserTrail && (
+                    <path
+                      d={eraserTrail}
+                      fillOpacity={0.32}
+                      pointerEvents="none"
+                      style={{ fill: "var(--muted-foreground)" }}
                     />
                   )}
                 </svg>
