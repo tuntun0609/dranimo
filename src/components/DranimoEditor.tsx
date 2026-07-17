@@ -28,6 +28,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { toast } from "sonner";
 import ProjectSwitcher from "@/components/ProjectSwitcher";
 import { SettingsPanelContent } from "@/components/SettingsPanelContent";
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
@@ -776,9 +777,7 @@ export default function DranimoEditor() {
           <IconButton
             label="帮助"
             className="max-[640px]:hidden"
-            onClick={() =>
-              setLoadError("提示：在画布上拖动即可绘制，橡皮擦会整笔删除")
-            }
+            onClick={() => toast("在画布上拖动即可绘制，橡皮擦会整笔删除")}
           >
             <CircleHelp size={18} />
           </IconButton>
