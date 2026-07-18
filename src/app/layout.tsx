@@ -4,8 +4,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Dranimo — 手绘动画",
-  description: "本地优先的手绘动画工具",
+  title: {
+    default: "Dranimo - 手绘动画工具",
+    template: "%s | Dranimo",
+  },
+  description: "在浏览器里手绘、调节动画节奏，并导出图片或视频。",
 };
 
 export default function RootLayout({

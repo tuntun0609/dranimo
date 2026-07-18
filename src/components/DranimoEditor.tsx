@@ -18,6 +18,7 @@ import {
   Volume2,
   X,
 } from "lucide-react";
+import Link from "next/link";
 import {
   cloneElement,
   isValidElement,
@@ -839,7 +840,11 @@ export default function DranimoEditor() {
   return (
     <main className="flex h-screen min-h-screen flex-col overflow-hidden bg-background">
       <header className="z-[3] flex h-16 flex-none items-center border-b border-border bg-[color-mix(in_oklab,var(--card)_88%,transparent)] px-[22px] backdrop-blur-lg max-[640px]:px-3">
-        <div className="flex min-w-[240px] items-center gap-[9px] text-[18px] font-bold tracking-[-0.04em] max-[980px]:min-w-[170px] max-[640px]:min-w-0">
+        <Link
+          href="/"
+          aria-label="返回 Dranimo 首页"
+          className="flex min-w-[240px] items-center gap-[9px] rounded-md text-[18px] font-bold tracking-[-0.04em] outline-none focus-visible:ring-3 focus-visible:ring-ring/50 max-[980px]:min-w-[170px] max-[640px]:min-w-0"
+        >
           <div className="grid size-7 -rotate-[7deg] place-items-center rounded-[9px] bg-accent text-foreground">
             <Sparkles size={16} />
           </div>
@@ -847,7 +852,7 @@ export default function DranimoEditor() {
           <span className="rounded-[5px] border border-input px-1.5 py-[3px] text-[9px] font-bold tracking-[0.08em] text-muted-foreground">
             MVP
           </span>
-        </div>
+        </Link>
         <ProjectSwitcher
           projects={projects}
           activeProjectId={activeProjectId}
