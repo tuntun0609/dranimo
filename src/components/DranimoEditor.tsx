@@ -30,6 +30,7 @@ import {
   useState,
 } from "react";
 import { toast } from "sonner";
+import { GitHubIcon } from "@/components/GitHubIcon";
 import ProjectSwitcher from "@/components/ProjectSwitcher";
 import { SettingsPanelContent } from "@/components/SettingsPanelContent";
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
@@ -865,6 +866,23 @@ export default function DranimoEditor() {
           onDelete={handleDeleteProject}
         />
         <div className="flex min-w-[240px] items-center justify-end gap-[7px] max-[640px]:min-w-0">
+          <Button
+            nativeButton={false}
+            render={
+              <Link
+                href="https://github.com/tuntun0609/dranimo"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="在 GitHub 查看 Dranimo"
+                title="GitHub"
+              />
+            }
+            variant="ghost"
+            size="icon"
+            className="size-[34px] rounded-[9px] text-muted-foreground"
+          >
+            <GitHubIcon data-icon="inline-start" />
+          </Button>
           <IconButton
             label="帮助"
             className="max-[640px]:hidden"

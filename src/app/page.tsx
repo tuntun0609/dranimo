@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { GitHubIcon } from "@/components/GitHubIcon";
 import { HeroDemo } from "@/components/home/HeroDemo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -121,14 +122,32 @@ export default function HomePage() {
               导出
             </a>
           </nav>
-          <Button
-            nativeButton={false}
-            render={<Link href="/editor" />}
-            size="sm"
-          >
-            打开编辑器
-            <ArrowRight data-icon="inline-end" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              nativeButton={false}
+              render={
+                <Link
+                  href="https://github.com/tuntun0609/dranimo"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="在 GitHub 查看 Dranimo"
+                  title="GitHub"
+                />
+              }
+              size="icon-sm"
+              variant="outline"
+            >
+              <GitHubIcon data-icon="inline-start" />
+            </Button>
+            <Button
+              nativeButton={false}
+              render={<Link href="/editor" />}
+              size="sm"
+            >
+              打开编辑器
+              <ArrowRight data-icon="inline-end" />
+            </Button>
+          </div>
         </div>
       </header>
 
