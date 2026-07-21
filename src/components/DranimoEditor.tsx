@@ -143,6 +143,28 @@ function exportFileBaseName(name: string) {
   return cleaned || "dranimo-animation";
 }
 
+const EXPORT_BACKGROUND_ITEMS = [
+  { label: "纯色（编辑器背景色）", value: "solid" },
+  { label: "透明", value: "transparent" },
+] as const;
+
+const EXPORT_CROP_ITEMS = [
+  { label: "完整画布", value: "full" },
+  { label: "自适应裁切", value: "fit" },
+] as const;
+
+const EXPORT_SCALE_ITEMS = [
+  { label: "1×", value: "1" },
+  { label: "2×", value: "2" },
+  { label: "3×", value: "3" },
+] as const;
+
+const EXPORT_FPS_ITEMS = [
+  { label: "24 fps", value: "24" },
+  { label: "30 fps", value: "30" },
+  { label: "60 fps", value: "60" },
+] as const;
+
 function IconButton({
   label,
   active,
@@ -1300,6 +1322,7 @@ export default function DranimoEditor() {
               <Field>
                 <FieldLabel>背景</FieldLabel>
                 <Select
+                  items={EXPORT_BACKGROUND_ITEMS}
                   value={getExportBackground(exportSettings)}
                   disabled={
                     exportSettings.format === "mov" ||
@@ -1328,6 +1351,7 @@ export default function DranimoEditor() {
               <Field>
                 <FieldLabel>画布范围</FieldLabel>
                 <Select
+                  items={EXPORT_CROP_ITEMS}
                   value={exportSettings.crop}
                   onValueChange={(value) =>
                     setExportSettings((current) => ({
@@ -1350,6 +1374,7 @@ export default function DranimoEditor() {
               <Field>
                 <FieldLabel>导出倍率</FieldLabel>
                 <Select
+                  items={EXPORT_SCALE_ITEMS}
                   value={String(exportSettings.scale)}
                   onValueChange={(value) =>
                     setExportSettings((current) => ({
@@ -1396,6 +1421,7 @@ export default function DranimoEditor() {
                 <Field>
                   <FieldLabel>帧率</FieldLabel>
                   <Select
+                    items={EXPORT_FPS_ITEMS}
                     value={String(exportSettings.fps)}
                     onValueChange={(value) =>
                       setExportSettings((current) => ({

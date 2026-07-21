@@ -46,6 +46,11 @@ const COLORS = [
   "#ffffff",
 ];
 
+const PRESSURE_SIMULATION_ITEMS = [
+  { label: "开启", value: "yes" },
+  { label: "关闭", value: "no" },
+] as const;
+
 const RATIO_ICON: Record<string, string> = {
   square: "size-6",
   landscape: "my-0.5 h-5 w-[30px]",
@@ -252,6 +257,7 @@ export function SettingsPanelContent({
                     压力模拟
                   </FieldLabel>
                   <Select
+                    items={PRESSURE_SIMULATION_ITEMS}
                     value={project.brush.simulatePressure ? "yes" : "no"}
                     onValueChange={(value) =>
                       updateBrush({ simulatePressure: value === "yes" })
