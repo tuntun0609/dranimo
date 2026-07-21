@@ -296,7 +296,43 @@ export default function HomePage() {
 
       <section className="home-local-band border-b border-border">
         <div className="mx-auto grid min-h-[320px] w-full max-w-[1240px] gap-10 px-5 py-16 md:grid-cols-[0.75fr_1.25fr] md:items-center md:px-8">
-          <LockKeyhole size={54} strokeWidth={1.4} />
+          <div className="home-local-visual" aria-hidden="true">
+            <div className="home-local-backdrop home-local-backdrop-one" />
+            <div className="home-local-backdrop home-local-backdrop-two" />
+            <div className="home-local-window">
+              <div className="home-local-window-top">
+                <div className="home-local-window-dots">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+                <span className="home-local-window-title">
+                  dranimo / 本地项目
+                </span>
+                <span className="home-local-window-status">本地</span>
+              </div>
+              <div className="home-local-window-body">
+                <div className="home-local-lock">
+                  <LockKeyhole size={30} strokeWidth={1.8} />
+                </div>
+                <div className="home-local-lines">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+              </div>
+              <div className="home-local-window-footer">
+                <span>仅保存在此设备</span>
+                <span className="home-local-check">
+                  <Check size={12} />
+                </span>
+              </div>
+            </div>
+            <div className="home-local-note">
+              <FolderClock size={14} strokeWidth={2} />
+              最近保存 · 刚刚
+            </div>
+          </div>
           <div>
             <Badge variant="secondary">
               <Check data-icon="inline-start" />
