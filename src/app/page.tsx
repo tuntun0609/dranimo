@@ -9,70 +9,70 @@ import {
   Pencil,
   Play,
   Sparkles,
-} from "lucide-react";
-import type { Metadata } from "next";
-import Link from "next/link";
-import { GitHubIcon } from "@/components/GitHubIcon";
-import { HeroDemo } from "@/components/home/HeroDemo";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { EXPORT_FORMATS } from "@/lib/formats";
+} from 'lucide-react'
+import type { Metadata } from 'next'
+import Link from 'next/link'
+import { GitHubIcon } from '@/components/GitHubIcon'
+import { HeroDemo } from '@/components/home/HeroDemo'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
+import { EXPORT_FORMATS } from '@/lib/formats'
 
 export const metadata: Metadata = {
   title: {
-    absolute: "Dranimo - 手绘动画工具",
+    absolute: 'Dranimo - 手绘动画工具',
   },
   description:
-    "在浏览器里手绘、调节动画节奏，并导出 PNG、SVG、WebM、MP4 或透明 MOV。",
-};
+    '在浏览器里手绘、调节动画节奏，并导出 PNG、SVG、WebM、MP4 或透明 MOV。',
+}
 
 const WORKFLOW = [
   {
-    number: "01",
-    title: "画下每一笔",
-    description: "鼠标、触控板或触摸屏都能直接绘制，笔触自然保留速度与压力感。",
+    number: '01',
+    title: '画下每一笔',
+    description: '鼠标、触控板或触摸屏都能直接绘制，笔触自然保留速度与压力感。',
     icon: Pencil,
-    accent: "coral",
+    accent: 'coral',
   },
   {
-    number: "02",
-    title: "调好动画节奏",
-    description: "按真实速度、固定速度或总时长回放，让线条在恰当的时间出现。",
+    number: '02',
+    title: '调好动画节奏',
+    description: '按真实速度、固定速度或总时长回放，让线条在恰当的时间出现。',
     icon: Play,
-    accent: "blue",
+    accent: 'blue',
   },
   {
-    number: "03",
-    title: "导出即用文件",
-    description: "同一份画布可以输出静态图、网页视频、通用视频或透明素材。",
+    number: '03',
+    title: '导出即用文件',
+    description: '同一份画布可以输出静态图、网页视频、通用视频或透明素材。',
     icon: Download,
-    accent: "yellow",
+    accent: 'yellow',
   },
-] as const;
+] as const
 
 const CAPABILITIES = [
   {
-    title: "有手感的画笔",
-    description: "颜色、粗细、透明度、平滑和压力模拟都能细调。",
+    title: '有手感的画笔',
+    description: '颜色、粗细、透明度、平滑和压力模拟都能细调。',
     icon: Pencil,
   },
   {
-    title: "常用画布比例",
-    description: "1:1、16:9、9:16 覆盖头像、视频与竖屏内容。",
+    title: '常用画布比例',
+    description: '1:1、16:9、9:16 覆盖头像、视频与竖屏内容。',
     icon: Layers3,
   },
   {
-    title: "可控的回放速度",
-    description: "按真实轨迹、固定像素速度或指定总时长播放。",
+    title: '可控的回放速度',
+    description: '按真实轨迹、固定像素速度或指定总时长播放。',
     icon: Gauge,
   },
   {
-    title: "本地项目库",
-    description: "多画布自动保存在当前浏览器，不需要先创建账号。",
+    title: '本地项目库',
+    description: '多画布自动保存在当前浏览器，不需要先创建账号。',
     icon: FolderClock,
   },
-] as const;
+] as const
 
 const FORMAT_LOOP = [
   ...EXPORT_FORMATS.map(({ format, long }) => ({
@@ -85,21 +85,20 @@ const FORMAT_LOOP = [
     format,
     label: long,
   })),
-];
+]
 
 function Brand() {
   return (
     <Link
       href="/"
       aria-label="Dranimo 首页"
-      className="inline-flex items-center gap-2 rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-    >
+      className="inline-flex items-center gap-2 rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
       <span className="grid size-8 -rotate-6 place-items-center rounded-md bg-studio-yellow text-foreground">
         <Sparkles size={17} />
       </span>
       <span className="text-lg font-bold">dranimo</span>
     </Link>
-  );
+  )
 }
 
 export default function HomePage() {
@@ -110,8 +109,7 @@ export default function HomePage() {
           <Brand />
           <nav
             aria-label="首页导航"
-            className="hidden items-center gap-7 text-sm text-muted-foreground md:flex"
-          >
+            className="hidden items-center gap-7 text-sm text-muted-foreground md:flex">
             <a className="home-nav-link" href="#features">
               功能
             </a>
@@ -135,15 +133,13 @@ export default function HomePage() {
                 />
               }
               size="icon-sm"
-              variant="outline"
-            >
+              variant="outline">
               <GitHubIcon data-icon="inline-start" />
             </Button>
             <Button
               nativeButton={false}
               render={<Link href="/editor" />}
-              size="sm"
-            >
+              size="sm">
               打开编辑器
               <ArrowRight data-icon="inline-end" />
             </Button>
@@ -153,8 +149,7 @@ export default function HomePage() {
 
       <section
         aria-labelledby="home-title"
-        className="home-hero border-b border-border"
-      >
+        className="home-hero border-b border-border">
         <div className="mx-auto grid w-full max-w-[1240px] items-center gap-10 px-5 py-14 md:px-8 md:py-20 lg:grid-cols-[0.9fr_1.1fr] lg:gap-14">
           <div className="max-w-[620px]">
             <Badge variant="outline">
@@ -163,8 +158,7 @@ export default function HomePage() {
             </Badge>
             <h1
               id="home-title"
-              className="mt-5 text-6xl leading-none font-black tracking-normal md:text-7xl"
-            >
+              className="mt-5 text-6xl leading-none font-black tracking-normal md:text-7xl">
               Dranimo
             </h1>
             <p className="mt-3 text-2xl leading-tight font-semibold md:text-3xl">
@@ -177,8 +171,7 @@ export default function HomePage() {
               <Button
                 nativeButton={false}
                 render={<Link href="/editor" />}
-                size="lg"
-              >
+                size="lg">
                 <Pencil data-icon="inline-start" />
                 开始绘制
               </Button>
@@ -186,8 +179,7 @@ export default function HomePage() {
                 nativeButton={false}
                 render={<Link href="#workflow" />}
                 size="lg"
-                variant="outline"
-              >
+                variant="outline">
                 看看它怎么工作
                 <ArrowRight data-icon="inline-end" />
               </Button>
@@ -204,16 +196,14 @@ export default function HomePage() {
       <section
         id="workflow"
         aria-labelledby="workflow-title"
-        className="scroll-mt-16 bg-background py-20 md:py-28"
-      >
+        className="scroll-mt-16 bg-background py-20 md:py-28">
         <div className="mx-auto w-full max-w-[1240px] px-5 md:px-8">
           <div className="grid gap-8 md:grid-cols-[0.8fr_1.2fr] md:items-end">
             <div>
               <Badge variant="secondary">三步完成</Badge>
               <h2
                 id="workflow-title"
-                className="mt-4 max-w-[520px] text-3xl leading-tight font-bold tracking-normal md:text-5xl"
-              >
+                className="mt-4 max-w-[520px] text-3xl leading-tight font-bold tracking-normal md:text-5xl">
                 从空白画布到可以分享的动画
               </h2>
             </div>
@@ -229,8 +219,7 @@ export default function HomePage() {
                 <article
                   key={number}
                   className="home-workflow-step border-b border-border py-8 last:border-b-0 md:border-r md:border-b-0 md:px-8 md:first:pl-0 md:last:border-r-0 md:last:pr-0"
-                  data-accent={accent}
-                >
+                  data-accent={accent}>
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-xs text-muted-foreground">
                       {number}
@@ -256,15 +245,13 @@ export default function HomePage() {
       <section
         id="features"
         aria-labelledby="features-title"
-        className="home-feature-band scroll-mt-16 border-y border-border py-20 md:py-28"
-      >
+        className="home-feature-band scroll-mt-16 border-y border-border py-20 md:py-28">
         <div className="mx-auto grid w-full max-w-[1240px] gap-12 px-5 md:px-8 lg:grid-cols-[0.72fr_1.28fr]">
           <div className="lg:sticky lg:top-24 lg:self-start">
             <Badge variant="outline">当前功能</Badge>
             <h2
               id="features-title"
-              className="mt-4 text-3xl leading-tight font-bold tracking-normal md:text-5xl"
-            >
+              className="mt-4 text-3xl leading-tight font-bold tracking-normal md:text-5xl">
               简单的入口，够用的控制
             </h2>
             <p className="mt-5 max-w-[430px] text-base leading-7 text-muted-foreground">
@@ -276,8 +263,7 @@ export default function HomePage() {
             {CAPABILITIES.map(({ title, description, icon: Icon }, index) => (
               <article
                 key={title}
-                className="home-capability border-b border-border py-8 sm:px-8 sm:even:border-l"
-              >
+                className="home-capability border-b border-border py-8 sm:px-8 sm:even:border-l">
                 <div className="flex items-start justify-between gap-5">
                   <Icon size={22} />
                   <span className="font-mono text-[10px] text-muted-foreground">
@@ -351,16 +337,14 @@ export default function HomePage() {
       <section
         id="formats"
         aria-labelledby="formats-title"
-        className="scroll-mt-16 overflow-hidden py-20 md:py-28"
-      >
+        className="scroll-mt-16 overflow-hidden py-20 md:py-28">
         <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-6 px-5 md:flex-row md:items-end md:justify-between md:px-8">
           <div>
             <Badge variant="secondary">一次绘制，多种输出</Badge>
             <h2
               id="formats-title"
-              className="mt-4 text-3xl leading-tight font-bold tracking-normal md:text-5xl"
-            >
-              从头像到透明视频素材
+              className="mt-4 text-3xl leading-tight font-bold tracking-normal md:text-5xl">
+              从绘制到透明视频素材
             </h2>
           </div>
           <p className="max-w-[460px] text-sm leading-6 text-muted-foreground md:text-right">
@@ -399,8 +383,7 @@ export default function HomePage() {
             nativeButton={false}
             render={<Link href="/editor" />}
             size="lg"
-            variant="secondary"
-          >
+            variant="secondary">
             打开空白画布
             <ArrowRight data-icon="inline-end" />
           </Button>
@@ -414,5 +397,5 @@ export default function HomePage() {
         </div>
       </footer>
     </main>
-  );
+  )
 }
